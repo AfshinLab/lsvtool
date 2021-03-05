@@ -35,6 +35,7 @@ def add_arguments():
 def naibr_or_lisv(filename):
     if str(filename).endswith("svcalls"): return("l")
     elif str(filename).endswith("sv_calls"): return ("n")
+    elif str(filename).endswith("pacbiocalls"): return ("p")
     else: sys.exit("Files are neither NAIBR or LinkedSV")
 
 def naibr_to_linkedSV(df):
@@ -42,6 +43,14 @@ def naibr_to_linkedSV(df):
     col12 = df["info"].str.replace("^.*?;","")
     lengths = abs(df.iloc[:,4]-df.iloc[:,1])
     df2 = pd.concat([df.iloc[:,0:6],types,df.iloc[:,6],lengths, df.iloc[:,7],df.iloc[:,10],col12], axis=1)
+    df2.columns = pd.array(["chrom1", "start1", "stop1", "chrom2", "start2", "stop2","sv_type",
+                            "sv_id", "sv_length", "qual_score", "filter", "info"])
+    return(df2)
+
+def pacbio_tolsv(df):
+    lengths = abs(df.iloc[:,4]-df.iloc[:,1])
+    df.iloc[:,7] = "0"
+    df2 = pd.concat([df.iloc[:,0:6],df.iloc[:,10],df.iloc[:,6],lengths,df.iloc[:,7:10]], axis=1)
     df2.columns = pd.array(["chrom1", "start1", "stop1", "chrom2", "start2", "stop2","sv_type",
                             "sv_id", "sv_length", "qual_score", "filter", "info"])
     return(df2)
@@ -88,17 +97,24 @@ def main():
     # START:
     ########
     # Read files
-    if naibr_or_lisv(file_name) == "n":
-        names = ["chrom1", "start1", "stop1", "chrom2", "start2", "stop2",
-                 "callID", "score", "a" , 'b', 'c','info']
-        df = pd.read_csv(aa.file_name, sep='\t', header=0, names=names)
-        df = naibr_to_linkedSV(df)
-    else:
-        names = ["chrom1", "start1", "stop1", "chrom2", "start2", "stop2",
-                 "sv_type", "sv_id", "sv_length", "qual_score", "filter", "info"]
+    if naibr_or_lisv(file_name) == "l":
+        print("-------- Loading LinkedSV file --------")
+        names = ["chrom1", "start1", "stop1", "chrom2", "start2", "stop2", "sv_type", "sv_id", "sv_length", "qual_score", "filter", "info"]
         df = pd.read_csv(aa.file_name, sep='\t', header=0, names=names)
         df.sv_length.replace(['N.A.'],"nan" ,inplace=True)
         df.sv_length = pd.to_numeric(df.sv_length, errors='coerce')
+
+    elif naibr_or_lisv(file_name) == "n":
+        print("-------- Loading NAIBR file --------")
+        names = ["chrom1", "start1", "stop1", "chrom2", "start2", "stop2", "callID", "score", "a" , 'b', 'c','info']
+        df = pd.read_csv(aa.file_name, sep='\t', header=0, names=names)
+        df = naibr_to_linkedSV(df)
+
+    elif naibr_or_lisv(file_name) == "p":
+        print("-------- Loading PacBio SV file --------")
+        names = ["chrom1", "start1", "stop1", "chrom2", "start2", "stop2", "info", "a" , 'b', 'c','type']
+        df = pd.read_csv(aa.file_name, sep='\t', header=0, names=names)
+        df = pacbio_tolsv(df)
 
     # Filters
     df = sort_natural(df)
@@ -109,12 +125,13 @@ def main():
         print("The top ",aa.quantile*100, "% of the QC will be kept", sep="")
         print("Cut off set: ",df.qual_score.quantile(q=aa.quantile),sep="")
         df = df[df.qual_score >= df.qual_score.quantile(q=aa.quantile)]
+        # hist = df.qual_score.hist(bins=df.shape[0])
+        # plt.show(hist)
+        # hist.figure.savefig("test.pdf")
     else:
-        print("No quality filtration for linkedSV files")
+        print("No quality filtration for non-naibr files")
+
     df = bedpe_to_bed(df)
-    #hist = df.qual_score.hist(bins=df.shape[0])
-    #plt.show(hist)
-    #hist.figure.savefig("test.pdf")
     bedfile = file_name + "_filtered_sorted.bed"
     bedfile_merged = file_name + "_filtered_sorted_merged.bed"
     bedpefile_merged = file_name + "_filtered_sorted_merged.bedpe"
@@ -127,7 +144,6 @@ def main():
         os.system("bedtools intersect -v -a tmp_{0} {1} > {0}".format(bedfile_merged,blacklist_code))
     else:
         os.system("cp tmp_{0} {0}".format(bedfile_merged))
-
     df = pd.read_csv(bedfile_merged,header=None, sep='\t')
     df = bed_to_bedpe(df)
     df.to_csv(bedpefile_merged, index=False, header=False, sep='\t')
