@@ -122,12 +122,17 @@ def main():
     df = df[df.sv_length <= aa.maxlength]
     df = df[df.sv_length >= aa.minlength]
     if naibr_or_lisv(file_name) == "n":
-        print("The top ",aa.quantile*100, "% of the QC will be kept", sep="")
-        print("Cut off set: ",df.qual_score.quantile(q=aa.quantile),sep="")
-        df = df[df.qual_score >= df.qual_score.quantile(q=aa.quantile)]
-        # hist = df.qual_score.hist(bins=df.shape[0])
-        # plt.show(hist)
-        # hist.figure.savefig("test.pdf")
+        print("The top ",(1-aa.quantile)*100, "% of the QC will be kept", sep="")
+        cuttoff=df.qual_score.quantile(q=aa.quantile)
+        print("Cut off set: ",cuttoff,sep="")
+        #df = df[df.qual_score >= cuttoff]
+        hist = df.qual_score.hist(bins=df.shape[0],)
+        hist.axvline(x=cuttoff, color='r', linestyle='dashed', linewidth=1,label= round(cuttoff,2))
+        hist.legend(loc='upper right')
+        hist.set_xlim([0, 5000])
+        #plt.show(hist)
+        hist.figure.savefig("QC_filter_{0}.pdf".format(file_name))
+        df = df[df.qual_score >= cuttoff]
     else:
         print("No quality filtration for non-naibr files")
 
