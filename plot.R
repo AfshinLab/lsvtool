@@ -15,9 +15,11 @@ library("VennDiagram")
 option_list = list(
   make_option(c("-i", "--input_vcf"), type="character",default="4_naibrs_merged.vcf", #NULL,
               help="merged VCF dataset input file name", metavar="character"),
-  make_option(c("-o", "--out"), type="character", default=NULL, 
-              help="output file name [default= %default]", metavar="character")
-); 
+  make_option(c("-t", "--type"), type="character", default=NULL,
+				      help="SV type to keep [DEL, DUP, INV] [default= %default]", metavar="character"),
+  make_option(c("-o", "--out"), type="character", default=NULL,
+				      help="output file name [default= %default]", metavar="character")
+);
 
 opt_parser = OptionParser(option_list=option_list);
 opt = parse_args(opt_parser);
@@ -57,7 +59,6 @@ ggplot(data=tt_melt,
        aes(x=variable, y=row, fill=value)) + geom_tile() +
        geom_text(aes(label=value), color='white') +
        theme_bw() + scale_fill_gradient(low = "yellow", high = "red",)
-
 
 dev.off()
 
@@ -99,7 +100,7 @@ names(list_to_plot) <- files_names[1:number_of_samples]
 myfill <- c("pink", "orange" ,"green","blue","red")
 myfill <- myfill[1:number_of_samples]
 venn.diagram(list_to_plot,
-             fill = myfill ,
+             fill = myfill , main = opt$type, #print.mode = "percent",
              alpha = rep(0.5,number_of_samples),
              cex = 2, lty =2, filename =  paste0(file_name,"overlap.gif"),
 );
