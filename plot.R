@@ -16,9 +16,10 @@ option_list = list(
   make_option(c("-i", "--input_vcf"), type="character",default="4_naibrs_merged.vcf", #NULL,
               help="merged VCF dataset input file name", metavar="character"),
   make_option(c("-t", "--type"), type="character", default=NULL,
-				      help="SV type to keep [DEL, DUP, INV] [default= %default]", metavar="character"),
-  make_option(c("-o", "--out"), type="character", default=NULL,
-				      help="output file name [default= %default]", metavar="character")
+				      help="SV type to keep [DEL, DUP, INV] [default= %default]", metavar="character")
+  #output will be by default the same as the input path
+  #make_option(c("-o", "--out"), type="character", default=NULL,
+	#			      help="output file name [default= %default]", metavar="character")
 );
 
 opt_parser = OptionParser(option_list=option_list);
@@ -29,6 +30,7 @@ if (!is.na(opt$input_vcf)) {
   vcf_file <- opt$input_vcf
   file_name <- print(opt$input_vcf)
   file_name <- gsub('.{4}$', '_', file_name)
+  print(file_name)
   bedpeout <- paste0(file_name,"list.bedpe")
 } else {
   stop("date parameter must be provided. See script usage (--help)")
@@ -40,6 +42,7 @@ number_of_samples <- (length(files_names))
 
 #Generating comparison matrix
 comparison_matrix <- sprintf("SURVIVOR genComp %s 0 %scomparison_matrix.txt", vcf_file, file_name)
+print(comparison_matrix)
 system(comparison_matrix)
 
 #Plot comparison matrix
@@ -66,12 +69,12 @@ if(number_of_samples > 5) {
 number_of_samples = 5      # plot only the first 5
   }
 
+
 files_names <- sub(x = files_names, pattern = "_final.naibr_sv_calls_filtered_sorted_merged.bedpe","_naibr",ignore.case = T)
 files_names <- sub(x = files_names, pattern = "_final.phased.bam.filtered_large_svcalls_filtered_sorted_merged.bedpe","_linkedsv",ignore.case = T)
 files_names <- gsub(x = files_names, pattern = "\\.BLR","",ignore.case = T)
 files_names <- sub(x = files_names, pattern = ".bedpe","",ignore.case = T) #if another file system
 files_names <- gsub(x = files_names, pattern = "\\.","\n",ignore.case = T)
-
 
 #Extract list of shared regions
 intersection_list <- paste0(file_name,"intersection_matrix.txt")
@@ -81,8 +84,8 @@ system(perl_code)
 
 
 #Save the intersection matrix
-system(sprintf("SURVIVOR vcftobed %s -1 -1 tmp_%s",vcf_file,bedpeout))
-system(sprintf("paste tmp_%1$s %2$s > %1$s && rm tmp_%1$s",bedpeout,intersection_list))
+system(sprintf("SURVIVOR vcftobed %s -1 -1 %s_tmp",vcf_file,bedpeout))
+system(sprintf("paste %1$s_tmp %2$s > %1$s && rm %1$s_tmp",bedpeout,intersection_list))
 
 
 #Plotting the intersections
