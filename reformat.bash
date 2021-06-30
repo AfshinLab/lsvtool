@@ -2,7 +2,8 @@
 
 perc=0.8
 tt="DEL" #"DEL"
-out_dir="output"
+
+out_dir="output"$perc$tt
 
 for file in $(ls *calls.bedpe)
 do
