@@ -110,13 +110,14 @@ myfill <- c("pink", "orange" ,"green","blue","red")
 myfill <- myfill[1:number_of_samples]
 venn.diagram(list_to_plot, output=True,
             #image  
-            filename =  paste0(file_name,"overlap.gif"),
+            filename =  paste0(file_name,"overlap.png"),
             main = opt$type, #print.mode = "percent",
             main.cex = .7,
             height = 1000 , 
             width = 1000 , 
             resolution = 300,
             compression = "lzw",
+            imagetype = "png",
             #cyrcles
             fill = myfill ,
             alpha = rep(0.5,number_of_samples),
