@@ -28,9 +28,9 @@ opt = parse_args(opt_parser);
 
 if (!is.na(opt$input_vcf)) {
   vcf_file <- opt$input_vcf
-  file_name <- print(opt$input_vcf)
+  cat(sprintf("\nFile to be plotted:\n%s\n\n",opt$input_vcf))
+  file_name <- opt$input_vcf
   file_name <- gsub('.{4}$', '_', file_name)
-  print(file_name)
   bedpeout <- paste0(file_name,"list.bedpe")
 } else {
   stop("date parameter must be provided. See script usage (--help)")
@@ -69,12 +69,18 @@ if(number_of_samples > 5) {
 number_of_samples = 5      # plot only the first 5
   }
 
-
-files_names <- sub(x = files_names, pattern = "_final.naibr_sv_calls_filtered_sorted_merged.bedpe","_naibr",ignore.case = T)
-files_names <- sub(x = files_names, pattern = "_final.phased.bam.filtered_large_svcalls_filtered_sorted_merged.bedpe","_linkedsv",ignore.case = T)
+#remove path
+files_names <- sub('.*/', '', files_names)
+#Keep the names of Naibr and linkedSV files
+files_names <- sub(x = files_names, pattern = "_filtered_sorted_merged.bedpe","",ignore.case = T)
+files_names <- sub(x = files_names, pattern = "_final.naibr_sv_calls","_naibr",ignore.case = T)
+files_names <- sub(x = files_names, pattern = "_final.phased.bam.filtered_large_svcalls","_linkedsv",ignore.case = T)
 files_names <- gsub(x = files_names, pattern = "\\.BLR","",ignore.case = T)
-files_names <- sub(x = files_names, pattern = ".bedpe","",ignore.case = T) #if another file system
-files_names <- gsub(x = files_names, pattern = "\\.","\n",ignore.case = T)
+#remove the bedpe if not Naibr nor linkedSV
+files_names <- sub(x = files_names, pattern = ".bedpe","",ignore.case = T) 
+
+#make new lines for every dot
+files_names <- gsub(x = files_names, pattern = "[\\._]","\n",ignore.case = T)
 
 #Extract list of shared regions
 intersection_list <- paste0(file_name,"intersection_matrix.txt")
@@ -102,10 +108,25 @@ names(list_to_plot) <- files_names[1:number_of_samples]
 
 myfill <- c("pink", "orange" ,"green","blue","red")
 myfill <- myfill[1:number_of_samples]
-venn.diagram(list_to_plot,
-             fill = myfill , main = opt$type, #print.mode = "percent",
-             alpha = rep(0.5,number_of_samples),
-             cex = 2, lty =2, filename =  paste0(file_name,"overlap.gif"),
-);
+venn.diagram(list_to_plot, output=True,
+            #image  
+            filename =  paste0(file_name,"overlap.gif"),
+            main = opt$type, #print.mode = "percent",
+            main.cex = .7,
+            height = 1000 , 
+            width = 1000 , 
+            resolution = 300,
+            compression = "lzw",
+            #cyrcles
+            fill = myfill ,
+            alpha = rep(0.5,number_of_samples),
+            cex = .5, #size numbers
+            lty = 4, #dotted line
+            lwd = .2, #thickness
+            #Set names
+            cat.cex = 0.3,
+            cat.default.pos = "outer", #or text
+            cat.dist = 0
+          );
 
 system(sprintf("rm %s",intersection_list))
