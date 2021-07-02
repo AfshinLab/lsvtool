@@ -5,11 +5,11 @@ tt="DEL" #"DEL"
 
 out_dir="output"$perc$tt
 
-for file in $(ls *calls.bedpe)
+for file in $(ls *.bedpe)
 do
 echo  ${file::${#file}-6}
 
-python filter_lsv.py -f $file -t $tt -q $perc -d 100 -o $out_dir #-bl ../hg38_black_list.bed,../hg38_gap.bed,centromers.hg38.bed #DUP INV
+python filter_lsv.py -f $file -t $tt -q $perc -d 100 -o $out_dir -bl black-lists/hg38.centromers.bed,black-lists/hg38_black_list.bed,black-lists/hg38_gap.bed #DUP INV
 
 done
 
