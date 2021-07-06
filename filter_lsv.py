@@ -5,7 +5,7 @@
 # output -> filtered VCF and bedpe file 
 ###
 
-import argparse, os, sys
+import argparse, os, sys, re
 import pandas as pd
 #from natsort import natsorted
 #import matplotlib.pyplot as plt
@@ -36,14 +36,15 @@ def add_arguments():
     return (parser, args)
 
 
-def naibr_or_lisv(filename):
+def detect_file_type(filename):
     if str(filename).endswith("svcalls"): return("l")
     elif str(filename).endswith("sv_calls"): return ("n")
-    elif str(filename).endswith("pacbiocalls"): return ("p")
-    else: sys.exit("Files are neither NAIBR or LinkedSV")
+    elif str(filename).endswith("pbcalls"): return ("p")
+    elif str(filename).endswith("tenxcalls"): return ("t")
+    else: sys.exit("Unknown structure of the bedpe file, file will not be loaded!")
 
 def naibr_to_linkedSV(df):
-    types = df["info"].str.split(";").str[0].str.replace("Type=","")
+    types = df['info'].apply(lambda x: re.search(r"Type=(\w+)",x).group(1) )
     col12 = df["info"].str.replace("^.*?;","")
     lengths = abs(df.iloc[:,4]-df.iloc[:,1])
     df2 = pd.concat([df.iloc[:,0:6],types,df.iloc[:,6],lengths, df.iloc[:,7],df.iloc[:,10],col12], axis=1)
@@ -51,13 +52,21 @@ def naibr_to_linkedSV(df):
                             "sv_id", "sv_length", "qual_score", "filter", "info"])
     return(df2)
 
-def pacbio_tolsv(df):
+def pacbio_to_linkedSV(df):
     lengths = abs(df.iloc[:,4]-df.iloc[:,1])
     df.iloc[:,7] = "0"
     df2 = pd.concat([df.iloc[:,0:6],df.iloc[:,10],df.iloc[:,6],lengths,df.iloc[:,7:10]], axis=1)
     df2.columns = pd.array(["chrom1", "start1", "stop1", "chrom2", "start2", "stop2","sv_type",
                             "sv_id", "sv_length", "qual_score", "filter", "info"])
     return(df2)
+
+def tenx_to_linkedSV(df):
+    types = df['info'].apply(lambda x: re.search(r"TYPE=(\w+)",x).group(1) )
+    lengths = abs(df.iloc[:,4]-df.iloc[:,1])
+    df2 = pd.concat([df.iloc[:,0:6],types,df.iloc[:,6],lengths, df.iloc[:,7],df.iloc[:,10],df.iloc[:,11]], axis=1)
+    df2.columns = pd.array(["chrom1", "start1", "stop1", "chrom2", "start2", "stop2","sv_type",
+                            "sv_id", "sv_length", "qual_score", "filter", "info"])
+    return(df2)    
 
 ### The following 2 functions are only for deletions, inversion and duplication,
 ### with an assumption that start1 = end1, start2 = end2, chr1 = chr2
@@ -102,36 +111,43 @@ def main():
     if not os.path.exists(aa.output_dir):
         os.makedirs(aa.output_dir)
 
-    print(blacklist_code)
+    #print(blacklist_code)
 
     # START:
     ########
     # Read files
-    if naibr_or_lisv(file_name) == "l":
-        print("-------- Loading LinkedSV file --------")
+    print("\n===========================\nChecking the bedpe file:\n{}\n".format(file_name))
+    if detect_file_type(file_name) == "l":
+        print("The file will be loaded as a LinkedSV file\nLoading...")
         names = ["chrom1", "start1", "stop1", "chrom2", "start2", "stop2", "sv_type", "sv_id", "sv_length", "qual_score", "filter", "info"]
         df = pd.read_csv(aa.file_name, sep='\t', header=0, names=names)
         df.sv_length.replace(['N.A.'],"nan" ,inplace=True)
         df.sv_length = pd.to_numeric(df.sv_length, errors='coerce')
 
-    elif naibr_or_lisv(file_name) == "n":
-        print("-------- Loading NAIBR file --------")
+    elif detect_file_type(file_name) == "n":
+        print("The file will be loaded as a NAIBR file\nLoading...".format(file_name))
         names = ["chrom1", "start1", "stop1", "chrom2", "start2", "stop2", "callID", "score", "a" , 'b', 'c','info']
         df = pd.read_csv(aa.file_name, sep='\t', header=0, names=names)
         df = naibr_to_linkedSV(df)
 
-    elif naibr_or_lisv(file_name) == "p":
-        print("-------- Loading PacBio SV file --------")
+    elif detect_file_type(file_name) == "p":
+        print("The file will be loaded as a PACBIO_SV file\nLoading...".format(file_name))
         names = ["chrom1", "start1", "stop1", "chrom2", "start2", "stop2", "info", "a" , 'b', 'c','type']
         df = pd.read_csv(aa.file_name, sep='\t', header=0, names=names)
-        df = pacbio_tolsv(df)
+        df = pacbio_to_linkedSV(df)
+
+    elif detect_file_type(file_name) == "t":
+        print("The file will be loaded as a 10X_SV file\nLoading...".format(file_name))
+        names = ["chrom1", "start1", "stop1", "chrom2", "start2", "stop2", "callID", "score", "a" , 'b', 'c','info']
+        df = pd.read_csv(aa.file_name, sep='\t', header=0, names=names)
+        df = tenx_to_linkedSV(df)
 
     # Filters
     df = sort_natural(df)
     df = df[df.sv_type == aa.svtype]
     df = df[df.sv_length <= aa.maxlength]
     df = df[df.sv_length >= aa.minlength]
-    if naibr_or_lisv(file_name) == "n":
+    if detect_file_type(file_name) == "n":
         print("The top ",(1-aa.quantile)*100, "% of the QC will be kept", sep="")
         cuttoff=df.qual_score.quantile(q=aa.quantile)
         print("Cut off set: ",cuttoff,sep="")
@@ -170,3 +186,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+
