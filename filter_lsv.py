@@ -29,7 +29,9 @@ def add_arguments():
     parser.add_argument("-d", "--max_distance", default=10000,type=int,
         help="Max distance between SV to be merged")
     parser.add_argument("-bl", "--blacklists", default=None, type=str,
-        help="blacklist 3-columns bed file(S) separated by commas (,) for more than one file! (no spaces) ")
+        help="blacklist (regions to discard) 3-columns bed file(s) separated by commas (,) for more than one file! (no spaces) ")
+    parser.add_argument("-wl", "--whitelists", default=None, type=str,
+        help="whitelist (regions to only include) 3-columns bed file(s) separated by commas (,) for more than one file! (no spaces) ")
     parser.add_argument("-o", "--output_dir", default=".", type=str,
         help="Output directory, Default is out ")
     args = parser.parse_args()
@@ -105,6 +107,15 @@ def main():
                 print("File \"{}\" does not exist so it will be skipped".format(file))
         blacklist_code = blacklist_code + " "
 
+    wlist_code = ""
+    if aa.whitelists:
+        for file in aa.whitelists.split(","):
+            if os.path.exists(file):
+                wlist_code = wlist_code + " -b " + file
+            else:
+                print("File \"{}\" does not exist so it will be skipped".format(file))
+        wlist_code = wlist_code + " "
+
     if not str(aa.output_dir).endswith("/"):
         aa.output_dir = aa.output_dir + "/"
 
@@ -172,18 +183,25 @@ def main():
     os.system("bedtools merge -i {} -c 4,5,6,7,8,9 -o first,collapse,max,mean,first,count -d {} > {}_temp".format(bedfile,aa.max_distance,bedfile_merged))
 
     if (blacklist_code):
-        os.system("bedtools intersect -v -a {0}_temp {1} > {0}".format(bedfile_merged,blacklist_code))
+        os.system("bedtools intersect -v -a {0}_temp {1} > {0}_temp2".format(bedfile_merged,blacklist_code))
     else:
-        os.system("cp {0}_temp {0}".format(bedfile_merged))
+        os.system("cp {0}_temp {0}_temp2".format(bedfile_merged))
+
+    if (wlist_code):
+        os.system("bedtools intersect -a {0}_temp2 {1} -wa > {0}".format(bedfile_merged,wlist_code))
+    else:
+        os.system("cp {0}_temp2 {0}".format(bedfile_merged))
+
+
+
     df = pd.read_csv(bedfile_merged,header=None, sep='\t')
     df = bed_to_bedpe(df)
     df.to_csv(bedpefile_merged, index=False, header=False, sep='\t')
 
     os.system("SURVIVOR bedpetovcf {} {}_temp".format(bedpefile_merged, vcffile_merged))
     os.system("less {0}_temp | sed s'/STRANDS=[0-9][- 0-9];//'g > {0}".format(vcffile_merged))
-    os.system("rm {0} {1} {1}_temp {2}_temp".format(bedfile, bedfile_merged, vcffile_merged))
+    os.system("rm {0} {1} {1}_temp {1}_temp2 {2}_temp".format(bedfile, bedfile_merged, vcffile_merged))
 
 
 if __name__ == '__main__':
     main()
-
