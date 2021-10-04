@@ -156,7 +156,8 @@ def main():
 
     # Filters
     df = sort_natural(df)
-    df = df[df.sv_type == aa.svtype]
+    if aa.svtype:
+        df = df[df.sv_type == aa.svtype]
     df = df[df.sv_length <= aa.maxlength]
     df = df[df.sv_length >= aa.minlength]
     if detect_file_type(file_name) == "n":
