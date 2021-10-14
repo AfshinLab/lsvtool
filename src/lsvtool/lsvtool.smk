@@ -2,21 +2,22 @@
 
 import pkg_resources
 
-ids, = glob_wildcards("{id}.bedpe")
+ids, = glob_wildcards("{id,[^/]+}.bedpe") #("{id}.bedpe")
+#ds = [id + "calls." for id in ids]
 
 perc=0.8
 svtype="DEL",
 dist=100
 
-scattergather:
-    split=8
 
+xx,  = glob_wildcards("to_igv_plot/{files}.bedpe")
 rule Final:
     input: 
         #expand("{filename}_filtered_sorted_merged.vcf",filename=ids),
-        expand("{perc}_{dist}_SVs_merged_overlap.png",perc=perc,dist=dist),
-        #"common_both.bedpe"
-        #"common_both.bedpe"
+        expand("merging/{perc}_{dist}_SVs_merged_list.bedpe",perc=perc,dist=dist),
+        "to_igv_plot/common.bedpe",
+        expand("to_igv_plot/{int_bedpe}.batch",int_bedpe=xx)
+       
 
 rule filter_lsv_files:
     input:
@@ -35,7 +36,7 @@ rule filter_lsv_files:
 rule merge_lsv_files:
     input: expand("filtered_inputs/{filename}_filtered_sorted_merged.vcf", filename=ids)
     output: 
-        "{perc}_{dist}_SVs_merged.vcf"
+        "merging/{perc}_{dist}_SVs_merged.vcf"
     params: 
         merge = "files_to_merge.txt"
     shell:
@@ -44,30 +45,29 @@ rule merge_lsv_files:
 
 
 rule plot_intersection:
-    input: "{perc}_{dist}_SVs_merged.vcf"
-    output:"{perc}_{dist}_SVs_merged_overlap.png"
+    input: "merging/{perc}_{dist}_SVs_merged.vcf"
+    output:"merging/{perc}_{dist}_SVs_merged_list.bedpe"
     params: pkg_resources.resource_filename("lsvtool", "cli/plot.R")
     shell: 
         "Rscript {params} -i {input}"
 
-
-# rule output_igv_batches:
-#     input: expand("{perc}_{dist}_SVs_merged.vcf",perc=perc,dist=dist)
-#     output: "common_both.bedpe"
-#     run:
-#         twofiles = ["less {input} \| cut -f 1,2,5,12 \| grep \'1 0\' \| sed \'s\/1 0 \/first\/g\' > common_both.bedpe"]
-#         #if two files only use:
-#         print("len IDs is :", len(ids), IDs)
-#         if len(ids)==2:
-#             shell(commands[0]) # && \\
-                     #less {input} | cut -f 1,2,5,12 | grep '0 1' | sed 's/0 1 /second/g' > unique_2nd.bedpe && \\ 
-                     #less {input} | cut -f 1,2,5,12 | grep '1 1' | sed 's/1 1 /both/g' > common_both.bedpe """)
+if len(ids)==2:
+    rule intersect_bedpe:
+        input: expand("merging/{perc}_{dist}_SVs_merged_list.bedpe", perc=perc,dist=dist)
+        output: "to_igv_plot/common.bedpe"
+        run:
+            print("len IDs is :", len(ids), ids)
+            shell("less {input} \| cut -f 1,2,5,12 \| grep \'1 1\' \| sed \'s\/1 1 \/both\/g\' > to_igv_plot/common.bedpe")
+            shell("less {input} \| cut -f 1,2,5,12 \| grep \'1 0\' \| sed \'s\/1 0 \/first\/g\' > to_igv_plot/unique_1st.bedpe")
+            shell("less {input} \| cut -f 1,2,5,12 \| grep \'0 1\' \| sed \'s\/0 1 \/second\/g\' > to_igv_plot/unique_2nd.bedpe")
 
 
-# less $out_dir/${perc}_${tt}_SVs_merged_list.bedpe | cut -f 1,2,5,12 | grep "1 0" | sed 's/1 0 /first/g'   > $out_dir/unique_1st.bedpe
-# less $out_dir/${perc}_${tt}_SVs_merged_list.bedpe | cut -f 1,2,5,12 | grep "0 1" | sed 's/0 1 /second/g'  > $out_dir/unique_2nd.bedpe
-# less $out_dir/${perc}_${tt}_SVs_merged_list.bedpe | cut -f 1,2,5,12 | grep "1 1" | sed 's/1 1 /both/g'    > $out_dir/common_both.bedpe
+    rule output_igv_batches:
+        input: "to_igv_plot/{int_bedpe}.bedpe"
+        output: "to_igv_plot/{int_bedpe}.batch"
+        run:
+            shell("bedtools igv -i {input} -slop 1000 -clps -name \| sed \'s\/collapse\/squish\/g\' > {output}")
 
-# bedtools igv -i $out_dir/unique_1st.bedpe -slop 1000 -clps -name | sed 's/collapse/squish/g' > $out_dir/unique_1st.batch
-# bedtools igv -i $out_dir/unique_2nd.bedpe -slop 1000 -clps -name | sed 's/collapse/squish/g' > $out_dir/unique_2nd.batch
-# bedtools igv -i $out_dir/common_both.bedpe -slop 1000 -clps -name | sed 's/collapse/squish/g' > $out_dir/common_both.batch
+        # bedtools igv -i $out_dir/unique_1st.bedpe -slop 1000 -clps -name | sed 's/collapse/squish/g' > $out_dir/unique_1st.batch
+        # bedtools igv -i $out_dir/unique_2nd.bedpe -slop 1000 -clps -name | sed 's/collapse/squish/g' > $out_dir/unique_2nd.batch
+        # bedtools igv -i $out_dir/common_both.bedpe -slop 1000 -clps -name | sed 's/collapse/squish/g' > $out_dir/common_both.batch
