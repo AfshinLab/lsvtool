@@ -57,17 +57,13 @@ if len(ids)==2:
         output: "to_igv_plot/common.bedpe"
         run:
             print("len IDs is :", len(ids), ids)
-            shell("less {input} \| cut -f 1,2,5,12 \| grep \'1 1\' \| sed \'s\/1 1 \/both\/g\' > to_igv_plot/common.bedpe")
-            shell("less {input} \| cut -f 1,2,5,12 \| grep \'1 0\' \| sed \'s\/1 0 \/first\/g\' > to_igv_plot/unique_1st.bedpe")
-            shell("less {input} \| cut -f 1,2,5,12 \| grep \'0 1\' \| sed \'s\/0 1 \/second\/g\' > to_igv_plot/unique_2nd.bedpe")
+            shell("less {input} | cut -f 1,2,5,12 | grep \'1 1\' | sed \'s/1 1 /both/g\' > to_igv_plot/common.bedpe")
+            shell("less {input} | cut -f 1,2,5,12 | grep \'1 0\' | sed \'s/1 0 /first/g\' > to_igv_plot/unique_1st.bedpe")
+            shell("less {input} | cut -f 1,2,5,12 | grep \'0 1\' | sed \'s/0 1 /second/g\' > to_igv_plot/unique_2nd.bedpe")
 
 
     rule output_igv_batches:
         input: "to_igv_plot/{int_bedpe}.bedpe"
         output: "to_igv_plot/{int_bedpe}.batch"
         run:
-            shell("bedtools igv -i {input} -slop 1000 -clps -name \| sed \'s\/collapse\/squish\/g\' > {output}")
-
-        # bedtools igv -i $out_dir/unique_1st.bedpe -slop 1000 -clps -name | sed 's/collapse/squish/g' > $out_dir/unique_1st.batch
-        # bedtools igv -i $out_dir/unique_2nd.bedpe -slop 1000 -clps -name | sed 's/collapse/squish/g' > $out_dir/unique_2nd.batch
-        # bedtools igv -i $out_dir/common_both.bedpe -slop 1000 -clps -name | sed 's/collapse/squish/g' > $out_dir/common_both.batch
+            shell("bedtools igv -i {input} -slop 1000 -clps -name | sed \'s/collapse/squish/g\' > {output}")
