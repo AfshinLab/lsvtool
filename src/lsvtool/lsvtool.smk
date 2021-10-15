@@ -2,9 +2,9 @@
 
 import pkg_resources
 import glob
+import numpy as np
 
-ids, = glob_wildcards("{id,[^/]+}.bedpe") #("{id}.bedpe")
-#ds = [id + "calls." for id in ids]
+ids, = glob_wildcards("{id,[^/]+}.bedpe") 
 
 perc=0.8
 svtype="DEL",
@@ -27,8 +27,7 @@ rule filter_lsv_files:
         centromers_bed = pkg_resources.resource_filename("lsvtool", "refs/hg38_centromers.bed")
         blacklist_bed = pkg_resources.resource_filename("lsvtool", "refs/hg38_black_list.bed")
         defaultBlacklists = f"{blacklist_bed},{gap_bed},{centromers_bed}"
-
-        print("\n\n\n",len(ids),ids,"\n\n\n")
+        #print("\n\n\n",len(ids),ids,"\n\n\n")
         shell("lsvtool filter_lsv  -f {input} -t {svtype} -q {perc} -d {dist} -bl {defaultBlacklists} -o filtered_inputs")
 
 rule merge_lsv_files:
@@ -49,15 +48,23 @@ rule plot_intersection:
     shell: 
         "Rscript {params} -i {input}"
 
-if len(ids)==2:
-    rule intersect_bedpe:
-        input: expand("merging/{perc}_{dist}_SVs_merged_list.bedpe", perc=perc,dist=dist)
-        output: "to_igv_plot/{files}.bedpe"
-        run:
-            print("len IDs is :", len(ids), ids)
-            shell("less {input} | cut -f 1,2,5,12 | grep \'1 1\' | sed \'s/1 1 /both/g\' > to_igv_plot/common.bedpe")
-            shell("less {input} | cut -f 1,2,5,12 | grep \'1 0\' | sed \'s/1 0 /first/g\' > to_igv_plot/unique_1st.bedpe")
-            shell("less {input} | cut -f 1,2,5,12 | grep \'0 1\' | sed \'s/0 1 /second/g\' > to_igv_plot/unique_2nd.bedpe")
+
+rule intersect_bedpe:
+    input: expand("merging/{perc}_{dist}_SVs_merged_list.bedpe", perc=perc,dist=dist)
+    output: "to_igv_plot/{files}.bedpe"
+    run:
+        n = len(ids)
+        xx = np.zeros((n,n))
+        for i in range (0,n):
+            xx[i,i]=1
+        xx = np.vstack( [xx,np.ones((n))])
+        combinations = [' '.join(c for c in str(xx[line]) if c.isdigit()) for line in range (0,n+1)]
+        
+        for i in combinations :
+            lable=i.replace(" ", "")
+            if not "0" in lable :
+                lable="common"
+            shell(f"less {input} | cut -f 1,2,5,12 | grep \'{i}\' | sed \'s/{i} /{lable}/g\' > to_igv_plot/{lable}.bedpe")
 
 
 rule output_igv_batches:
