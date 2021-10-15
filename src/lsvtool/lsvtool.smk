@@ -1,6 +1,7 @@
 ## The pipe will start with bedpe inputs
 
 import pkg_resources
+import glob
 
 ids, = glob_wildcards("{id,[^/]+}.bedpe") #("{id}.bedpe")
 #ds = [id + "calls." for id in ids]
@@ -9,14 +10,11 @@ perc=0.8
 svtype="DEL",
 dist=100
 
-
-xx,  = glob_wildcards("to_igv_plot/{files}.bedpe")
 rule Final:
     input: 
         #expand("{filename}_filtered_sorted_merged.vcf",filename=ids),
         expand("merging/{perc}_{dist}_SVs_merged_list.bedpe",perc=perc,dist=dist),
-        "to_igv_plot/common.bedpe",
-        expand("to_igv_plot/{int_bedpe}.batch",int_bedpe=xx)
+        "to_igv_plot/common.batch"
        
 
 rule filter_lsv_files:
@@ -54,7 +52,7 @@ rule plot_intersection:
 if len(ids)==2:
     rule intersect_bedpe:
         input: expand("merging/{perc}_{dist}_SVs_merged_list.bedpe", perc=perc,dist=dist)
-        output: "to_igv_plot/common.bedpe"
+        output: "to_igv_plot/{files}.bedpe"
         run:
             print("len IDs is :", len(ids), ids)
             shell("less {input} | cut -f 1,2,5,12 | grep \'1 1\' | sed \'s/1 1 /both/g\' > to_igv_plot/common.bedpe")
@@ -62,8 +60,10 @@ if len(ids)==2:
             shell("less {input} | cut -f 1,2,5,12 | grep \'0 1\' | sed \'s/0 1 /second/g\' > to_igv_plot/unique_2nd.bedpe")
 
 
-    rule output_igv_batches:
-        input: "to_igv_plot/{int_bedpe}.bedpe"
-        output: "to_igv_plot/{int_bedpe}.batch"
-        run:
-            shell("bedtools igv -i {input} -slop 1000 -clps -name | sed \'s/collapse/squish/g\' > {output}")
+rule output_igv_batches:
+    input: "to_igv_plot/{file}.bedpe"
+    output:  "to_igv_plot/{file}.batch"
+    run:
+        for file in glob.glob("to_igv_plot/*bedpe"):
+            fileout = file.rsplit('.', 1)[0] + '.batch' 
+            shell("bedtools igv -i {file} -slop 1000 -clps -name | sed \'s/collapse/squish/g\' > {fileout}")
