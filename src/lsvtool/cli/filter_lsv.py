@@ -24,7 +24,7 @@ def add_arguments(parser):
     # formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument( "-f", "--file_name", default=None,
         help="bedpe file generated from NAIBR")
-    parser.add_argument("-t", "--svtype", default="DEL",
+    parser.add_argument("-t", "--svtype", default=None,
         help="SV type to keep [DEL, DUP, INV]")
     parser.add_argument("-M", "--maxlength", default=10000000,type=int,
         help="Max SV length to keep")
@@ -48,28 +48,31 @@ output_columns = pd.array(["chrom1", "start1", "stop1", "chrom2", "start2", "sto
 
 # Converting functions
 def detect_file_type(filename):
-    if str(filename).endswith("svcalls"): return("l")
-    elif str(filename).endswith("sv_calls"): return ("n")
-    elif str(filename).endswith("pbcalls"): return ("p")
-    elif str(filename).endswith("tenxcalls"): return ("t")
+    if   "naibr"    in str(filename): return("n")
+    elif "linkedsv" in str(filename): return ("l")
+    elif "pbcalls"  in str(filename): return ("p")
+    elif "tenx"     in str(filename): return ("t")
     else: sys.exit("Unknown structure of the bedpe file, file will not be loaded!")
 
-def naibr_to_linkedSV(df):
-    types = df['info'].apply(lambda x: re.search(r"Type=(\w+)",x).group(1) )
-    col12 = df["info"].str.replace("^.*?;","")
-    lengths = abs(df.iloc[:,4]-df.iloc[:,1])
-    df2 = pd.concat([df.iloc[:,0:6],types,df.iloc[:,6],lengths, df.iloc[:,7],df.iloc[:,10],col12], axis=1)
+def naibr_to_mainformat(df):
+    if "call" in str(df.iloc[0,6]): #old naibr
+        types = df['info'].apply(lambda x: re.search(r"Type=(\w+)",x).group(1) )
+        col12 = df["info"].str.replace("^.*?;","")
+        lengths = abs(df.iloc[:,4]-df.iloc[:,1])
+        df2 = pd.concat([df.iloc[:,0:6],types,df.iloc[:,6],lengths, df.iloc[:,7],df.iloc[:,10],col12], axis=1)
+    else: #new naibr
+        df2=df
     df2.columns = output_columns
     return(df2)
 
-def pacbio_to_linkedSV(df):
+def pacbio_to_mainformat(df):
     lengths = abs(df.iloc[:,4]-df.iloc[:,1])
     df.iloc[:,7] = "0"
     df2 = pd.concat([df.iloc[:,0:6],df.iloc[:,10],df.iloc[:,6],lengths,df.iloc[:,7:10]], axis=1)
     df2.columns = output_columns
     return(df2)
 
-def tenx_to_linkedSV(df):
+def tenx_to_mainformat(df):
     types = df['info'].apply(lambda x: re.search(r"TYPE=(\w+)",x).group(1) )
     lengths = abs(df.iloc[:,4]-df.iloc[:,1])
     df2 = pd.concat([df.iloc[:,0:6],types,df.iloc[:,6],lengths, df.iloc[:,7],df.iloc[:,10],df.iloc[:,11]], axis=1)
@@ -77,30 +80,30 @@ def tenx_to_linkedSV(df):
     return(df2)    
 
 # reading functions
-def read_linkedsv(filename):
-        print("The file will be loaded as a LinkedSV file\nLoading...")
-        names = ["chrom1", "start1", "stop1", "chrom2", "start2", "stop2", "sv_type", "sv_id", "sv_length", "qual_score", "filter", "info"]
-        df = pd.read_csv(filename, sep='\t', header=0, names=names)
-        df.sv_length.replace(['N.A.'],"nan" ,inplace=True)
-        df.sv_length = pd.to_numeric(df.sv_length, errors='coerce')
-        return df
-
 def read_naibr(filename):
         print("The file will be loaded as a NAIBR file\nLoading...".format(filename))
         names = ["chrom1", "start1", "stop1", "chrom2", "start2", "stop2", "callID", "score", "a" , 'b', 'c','info']
-        df = pd.read_csv(filename, sep='\t', header=0, names=names)
+        df = pd.read_csv(filename, sep='\t', header=0, names=names,comment="#")
+        return df
+
+def read_linkedsv(filename):
+        print("The file will be loaded as a LinkedSV file\nLoading...")
+        names = ["chrom1", "start1", "stop1", "chrom2", "start2", "stop2", "sv_type", "sv_id", "sv_length", "qual_score", "filter", "info"]
+        df = pd.read_csv(filename, sep='\t', header=0, names=names,comment="#")
+        df.sv_length.replace(['N.A.'],"nan" ,inplace=True)
+        df.sv_length = pd.to_numeric(df.sv_length, errors='coerce')
         return df
 
 def read_pacbio(filename):
         print("The file will be loaded as a PACBIO_SV file\nLoading...".format(filename))
         names = ["chrom1", "start1", "stop1", "chrom2", "start2", "stop2", "info", "a" , 'b', 'c','type']
-        df = pd.read_csv(filename, sep='\t', header=0, names=names)
+        df = pd.read_csv(filename, sep='\t', header=0, names=names,comment="#")
         return df
 
 def read_10x(filename):
         print("The file will be loaded as a 10X_SV file\nLoading...".format(filename))
         names = ["chrom1", "start1", "stop1", "chrom2", "start2", "stop2", "callID", "score", "a" , 'b', 'c','info']
-        df = pd.read_csv(filename, sep='\t', header=0, names=names)
+        df = pd.read_csv(filename, sep='\t', header=0, names=names,comment="#")
         return df
 
 ### The following 2 functions are only for deletions, inversion and duplication,
@@ -142,20 +145,20 @@ def main(args):
     ########
     # Read files
     print("\n===========================\nChecking the bedpe file:\n{}\n".format(file_name))
-    if detect_file_type(file_name) == "l":
-        df = read_linkedsv(aa.file_name)
-
-    elif detect_file_type(file_name) == "n":
+    if detect_file_type(file_name) == "n":
         df = read_naibr(aa.file_name)
-        df = naibr_to_linkedSV(df)
+        df = naibr_to_mainformat(df)
+
+    elif detect_file_type(file_name) == "l":
+        df = read_linkedsv(aa.file_name)
 
     elif detect_file_type(file_name) == "p":
         df = read_pacbio(aa.file_name)
-        df = pacbio_to_linkedSV(df)
+        df = pacbio_to_mainformat(df)
 
     elif detect_file_type(file_name) == "t":
         df = read_10x(aa.file_name)
-        df = tenx_to_linkedSV(df)
+        df = tenx_to_mainformat(df)
 
     # Filters
     df = sort_natural(df)
