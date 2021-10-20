@@ -57,15 +57,17 @@ rule intersect_bedpe:
         xx = np.zeros((n,n))
         for i in range (0,n):
             xx[i,i]=1
-        xx = np.vstack( [xx,np.ones((n))])
+        xx = np.vstack( [xx,np.ones((n))] )
         combinations = [' '.join(c for c in str(xx[line]) if c.isdigit()) for line in range (0,n+1)]
         
         for i in combinations :
             lable=i.replace(" ", "")
             if not "0" in lable :
                 lable="common"
-            shell(f"less {input} | cut -f 1,2,5,12 | grep \'{i}\' | sed \'s/{i} /{lable}/g\' > to_igv_plot/{lable}.bedpe")
-
+            try:
+                shell(f"less {input} | cut -f 1,2,5,12 | grep \'{i}\' | sed \'s/{i} /{lable}/g\' > to_igv_plot/{lable}.bedpe")
+            except:
+                continue
 
 rule output_igv_batches:
     input: "to_igv_plot/{file}.bedpe"
