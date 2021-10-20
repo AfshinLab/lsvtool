@@ -8,7 +8,7 @@ ids, = glob_wildcards("{id,[^/]+}.bedpe")
 
 perc=0.8
 svtype="DEL",
-dist=100
+dist=1000
 
 rule Final:
     input: 

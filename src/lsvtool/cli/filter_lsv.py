@@ -28,11 +28,11 @@ def add_arguments(parser):
         help="SV type to keep [DEL, DUP, INV]")
     parser.add_argument("-M", "--maxlength", default=10000000,type=int,
         help="Max SV length to keep")
-    parser.add_argument("-m", "--minlength", default=10000,type=int,
+    parser.add_argument("-m", "--minlength", default=1000,type=int,
         help="Min SV length to keep")
     parser.add_argument("-q", "--quantile", default=0.5, type=float,
         help="Remove SV with QC less than the quantile (for NAIBR only)")
-    parser.add_argument("-d", "--max_distance", default=10000,type=int,
+    parser.add_argument("-d", "--max_distance", default=1000,type=int,
         help="Max distance between SV to be merged")
     parser.add_argument("-bl", "--blacklists", default=None, type=str,
         help="blacklist (regions to discard) 3-columns bed file(s) separated by commas (,) for more than one file! (no spaces) ")
@@ -48,10 +48,11 @@ output_columns = pd.array(["chrom1", "start1", "stop1", "chrom2", "start2", "sto
 
 # Converting functions
 def detect_file_type(filename):
-    if   "naibr"    in str(filename): return("n")
-    elif "linkedsv" in str(filename): return ("l")
-    elif "pbcalls"  in str(filename): return ("p")
-    elif "tenx"     in str(filename): return ("t")
+    if   "naibr"    in str(filename).lower(): return("n")
+    elif "grch"     in str(filename).lower(): return ("m")
+    elif "linkedsv" in str(filename).lower(): return ("l")
+    elif "pbcalls"  in str(filename).lower(): return ("p")
+    elif "tenx"     in str(filename).lower(): return ("t")
     else: sys.exit("Unknown structure of the bedpe file, file will not be loaded!")
 
 def naibr_to_mainformat(df):
@@ -86,8 +87,8 @@ def read_naibr(filename):
         df = pd.read_csv(filename, sep='\t', header=0, names=names,comment="#")
         return df
 
-def read_linkedsv(filename):
-        print("The file will be loaded as a LinkedSV file\nLoading...")
+def read_mainformat(filename):
+        print("The file will be loaded as a Mainformat for bedpe file\nLoading...")
         names = ["chrom1", "start1", "stop1", "chrom2", "start2", "stop2", "sv_type", "sv_id", "sv_length", "qual_score", "filter", "info"]
         df = pd.read_csv(filename, sep='\t', header=0, names=names,comment="#")
         df.sv_length.replace(['N.A.'],"nan" ,inplace=True)
@@ -149,8 +150,8 @@ def main(args):
         df = read_naibr(aa.file_name)
         df = naibr_to_mainformat(df)
 
-    elif detect_file_type(file_name) == "l":
-        df = read_linkedsv(aa.file_name)
+    elif detect_file_type(file_name) == "m" or detect_file_type(file_name) == "l":
+        df = read_mainformat(aa.file_name)
 
     elif detect_file_type(file_name) == "p":
         df = read_pacbio(aa.file_name)
@@ -183,7 +184,7 @@ def main(args):
         plt.close()
         df = df[df.qual_score >= cuttoff]
     else:
-        print("No quality filtration for non-naibr files\n")
+        print("No quality number filtration for non-naibr files\n")
 
     df = bedpe_to_bed(df)
     bedfile = aa.output_dir + file_name + "_filtered_sorted.bed"
