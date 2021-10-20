@@ -3,12 +3,15 @@
 import pkg_resources
 import glob
 import numpy as np
+ 
+configfile: "parameters.config"
+perc=config["perc"]
+svtype=config["svtype"]
+dist=config["dist"]
+minlength=config["minlength"]
+
 
 ids, = glob_wildcards("{id,[^/]+}.bedpe") 
-
-perc=0.8
-svtype="DEL",
-dist=1000
 
 rule Final:
     input: 
@@ -28,7 +31,7 @@ rule filter_lsv_files:
         blacklist_bed = pkg_resources.resource_filename("lsvtool", "refs/hg38_black_list.bed")
         defaultBlacklists = f"{blacklist_bed},{gap_bed},{centromers_bed}"
         #print("\n\n\n",len(ids),ids,"\n\n\n")
-        shell("lsvtool filter_lsv  -f {input} -t {svtype} -q {perc} -d {dist} -bl {defaultBlacklists} -o filtered_inputs")
+        shell("lsvtool filter_lsv  -f {input} -t {svtype} -q {perc} -d {dist} -bl {defaultBlacklists} -m {minlength} -o filtered_inputs")
 
 rule merge_lsv_files:
     input: expand("filtered_inputs/{filename}_filtered_sorted_merged.vcf", filename=ids)
@@ -38,7 +41,7 @@ rule merge_lsv_files:
         merge = "files_to_merge.txt"
     shell:
         "cd filtered_inputs && ls *_filtered_sorted_merged.vcf > {params.merge}"
-        " && SURVIVOR merge {params.merge} 5000 1 0 0 0 10000 ../{output}"
+        " && SURVIVOR merge {params.merge} {dist} 1 0 0 0 {minlength} ../{output}"
 
 
 rule plot_intersection:

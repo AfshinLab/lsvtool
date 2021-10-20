@@ -3,7 +3,6 @@ Create and initialize a new analysis directory.
 """
 import logging
 import os
-import re
 import os.path
 import sys
 from pathlib import Path
@@ -28,9 +27,9 @@ def add_arguments(parser):
 
 def main(args):
     init(args.input_bedpe, args.out_directory)
-import pandas as pd
-
-
+    config_file = pkg_resources.resource_filename("lsvtool","/cli/parameters.config")
+    os.system("cp {} {}/parameters.config".format(config_file, args.out_directory))
+    
 def init(bedpe: list, directory: Path):
     bedpe = [''.join([str(elem) for elem in i]) for i in bedpe[0]]
 
