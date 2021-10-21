@@ -9,7 +9,7 @@ perc=config["perc"]
 svtype=config["svtype"]
 dist=config["dist"]
 minlength=config["minlength"]
-
+maxlength=config["maxlength"]
 
 ids, = glob_wildcards("{id,[^/]+}.bedpe") 
 
@@ -31,7 +31,7 @@ rule filter_lsv_files:
         blacklist_bed = pkg_resources.resource_filename("lsvtool", "refs/hg38_black_list.bed")
         defaultBlacklists = f"{blacklist_bed},{gap_bed},{centromers_bed}"
         #print("\n\n\n",len(ids),ids,"\n\n\n")
-        shell("lsvtool filter_lsv  -f {input} -t {svtype} -q {perc} -d {dist} -bl {defaultBlacklists} -m {minlength} -o filtered_inputs")
+        shell("lsvtool filter_lsv  -f {input} -t {svtype} -q {perc} -d {dist} -m {minlength} -M {maxlength} -bl {defaultBlacklists} -o filtered_inputs")
 
 rule merge_lsv_files:
     input: expand("filtered_inputs/{filename}_filtered_sorted_merged.vcf", filename=ids)
