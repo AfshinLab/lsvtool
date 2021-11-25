@@ -11,12 +11,12 @@ import pkg_resources
 
 logger = logging.getLogger(__name__)
 
-ACCEPTED_FILE_EXT = (".bedpe", "bed")
+ACCEPTED_FILE_EXT = (".vcf", ".vcf.gz")
 
 def add_arguments(parser):
     parser.add_argument(
         "-i", "--input_bedpe", type=list, action='append', nargs='+',
-        help="input bedpe file(s) separated by spaces, to perform the filteration and intersection "
+        help="input vcf file(s) separated by spaces, to perform the filteration and intersection "
              "detected in the same directory"
     )
     parser.add_argument(
