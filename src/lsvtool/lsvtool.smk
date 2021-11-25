@@ -10,6 +10,7 @@ svtype=config["svtype"]
 dist=config["dist"]
 minlength=config["minlength"]
 maxlength=config["maxlength"]
+refgenome=config["refgenome"]
 
 ids, = glob_wildcards("{id,[^/]+}.vcf.gz") 
 
@@ -26,12 +27,12 @@ rule filter_lsv_files:
     output: 
         "filtered_inputs/{filename}_filtered_sorted_merged.vcf"
     run:
-        gap_bed = pkg_resources.resource_filename("lsvtool", "refs/hg38_gap.bed")
-        centromers_bed = pkg_resources.resource_filename("lsvtool", "refs/hg38_centromers.bed")
-        blacklist_bed = pkg_resources.resource_filename("lsvtool", "refs/hg38_black_list.bed")
+        gap_bed = pkg_resources.resource_filename("lsvtool", "refs/{}_gap.bed".format(refgenome))
+        centromers_bed = pkg_resources.resource_filename("lsvtool", "refs/{}_centromers.bed".format(refgenome))
+        blacklist_bed = pkg_resources.resource_filename("lsvtool", "refs/{}_black_list.bed".format(refgenome))
         defaultBlacklists = f"{blacklist_bed},{gap_bed},{centromers_bed}"
         #print("\n\n\n",len(ids),ids,"\n\n\n")
-        shell("lsvtool filter_lsv  -f {input} -t {svtype} -q {perc} -d {dist} -m {minlength} -M {maxlength} -o filtered_inputs") #-bl {defaultBlacklists}
+        shell("lsvtool filter_lsv  -f {input} -t {svtype} -q {perc} -d {dist} -m {minlength} -M {maxlength} -bl {defaultBlacklists} -o filtered_inputs") 
 
 rule merge_lsv_files:
     input: expand("filtered_inputs/{filename}_filtered_sorted_merged.vcf", filename=ids)
