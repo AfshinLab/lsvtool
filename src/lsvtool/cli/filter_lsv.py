@@ -39,9 +39,6 @@ def add_arguments(parser):
         help="Output directory, Default is out ")
 
 
-output_columns = pd.array(["chrom1", "start1", "stop1", "chrom2", "start2", "stop2","sv_type",
-                            "sv_id", "sv_length", "qual_score", "filter", "info"])
-
 # Converting functions
 def check_ext(filename):
     if  str(filename).endswith(".vcf") or str(filename).endswith(".vcf.gz"):
@@ -49,20 +46,24 @@ def check_ext(filename):
     else:
         sys.exit("input file is not vcf or vcf.gz")
 
-# reading functions
-def read_naibr(filename):
-        print("The file will be loaded as a NAIBR file\nLoading...".format(filename))
-        names = ["chrom1", "start1", "stop1", "chrom2", "start2", "stop2", "callID", "score", "a" , 'b', 'c','info']
-        df = pd.read_csv(filename, sep='\t', header=0, names=names,comment="#")
-        return df
-
-def read_mainformat(filename):
-        print("The file will be loaded as a Mainformat for bedpe file\nLoading...")
-        names = ["chrom1", "start1", "stop1", "chrom2", "start2", "stop2", "sv_type", "sv_id", "sv_length", "qual_score", "filter", "info"]
-        df = pd.read_csv(filename, sep='\t', header=0, names=names,comment="#")
-        df.sv_length.replace(['N.A.'],"nan" ,inplace=True)
-        df.sv_length = pd.to_numeric(df.sv_length, errors='coerce')
-        return df
+# naibr filter functionls
+def filter_naibr(df,quantile):
+    print("The top ",(1-quantile)*100, "% of the QC will be kept", sep="")
+    cuttoff=df.quality.quantile(q=quantile)
+    print("Cut off set: ",cuttoff,sep="")
+    df = df[df.quality >= cuttoff]
+    #     #hist = df.qual_score.hist(bins=df.shape[0])
+    #     matplotlib.use('Agg')
+    #     plt.hist(df.qual_score, bins=df.shape[0])
+    #     plt.axvline(x=cuttoff, color='r', linestyle='dashed', linewidth=1,
+    #                 label= round(cuttoff,2))
+    #     plt.legend(loc='upper right')
+    #     plt.xlim(0, 5000)
+    #     #plt.show(hist)
+    #     plt.savefig("{0}QC_filter_{1}.pdf".format(aa.output_dir,file_name))
+    #     plt.close()
+    df = df[df.quality >= cuttoff]
+    return df
 
 #VCF file is 10 columns, bedpe output is 12 columns
 def vcf_to_bedpe(filename):
@@ -150,24 +151,12 @@ def main(args):
     if aa.minlength:    
         bedpelist = bedpelist[bedpelist["length"]>=aa.minlength]
 
-    # if detect_file_type(file_name) == "n":
-    #     print("The top ",(1-aa.quantile)*100, "% of the QC will be kept", sep="")
-    #     cuttoff=df.qual_score.quantile(q=aa.quantile)
-    #     print("Cut off set: ",cuttoff,sep="")
-    #     #df = df[df.qual_score >= cuttoff]
-    #     #hist = df.qual_score.hist(bins=df.shape[0])
-    #     matplotlib.use('Agg')
-    #     plt.hist(df.qual_score, bins=df.shape[0])
-    #     plt.axvline(x=cuttoff, color='r', linestyle='dashed', linewidth=1,
-    #                 label= round(cuttoff,2))
-    #     plt.legend(loc='upper right')
-    #     plt.xlim(0, 5000)
-    #     #plt.show(hist)
-    #     plt.savefig("{0}QC_filter_{1}.pdf".format(aa.output_dir,file_name))
-    #     plt.close()
-    #     df = df[df.qual_score >= cuttoff]
-    # else:
-    #     print("No quality number filtration for non-naibr files\n")
+    if  "naibr" in filerootname:
+        if aa.quantile>0: 
+            print("naibr is in the file name, and perc in config file is not 0 ==> file will be filtered..")
+            bedpelist = filter_naibr(bedpelist,aa.quantile)
+        else:
+            print("File is naibr but no quality filtration is applied on the list")
 
     df = bedpe_to_bed(bedpelist)
     bedfile = aa.output_dir + filerootname + "_filtered_sorted.bed"
