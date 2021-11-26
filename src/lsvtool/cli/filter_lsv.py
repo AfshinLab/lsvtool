@@ -48,7 +48,7 @@ def check_ext(filename):
 
 # naibr filter functionls
 def filter_naibr(df,quantile):
-    print("The top ",(1-quantile)*100, "% of the QC will be kept", sep="")
+    print("The top ",round((1-quantile)*100), "% of the QC will be kept", sep="")
     cuttoff=df.quality.quantile(q=quantile)
     print("Cut off set: ",cuttoff,sep="")
     df = df[df.quality >= cuttoff]
