@@ -48,10 +48,11 @@ def check_ext(filename):
 
 # naibr filter functionls
 def filter_naibr(df,quantile):
-    print("The top ",round((1-quantile)*100), "% of the QC will be kept", sep="")
     cuttoff=df.quality.quantile(q=quantile)
-    print("Cut off set: ",cuttoff,sep="")
-    df = df[df.quality >= cuttoff]
+    if cuttoff.isdigit:
+        print("The top ",round((1-quantile)*100), "% of the QC will be kept", sep="")
+        print("Cut off set: ",cuttoff,sep="")
+        df = df[df.quality >= cuttoff]
     #     #hist = df.qual_score.hist(bins=df.shape[0])
     #     matplotlib.use('Agg')
     #     plt.hist(df.qual_score, bins=df.shape[0])
@@ -62,7 +63,9 @@ def filter_naibr(df,quantile):
     #     #plt.show(hist)
     #     plt.savefig("{0}QC_filter_{1}.pdf".format(aa.output_dir,file_name))
     #     plt.close()
-    df = df[df.quality >= cuttoff]
+        df = df[df.quality >= cuttoff]
+    else:
+        print("There is no values in quality column, no filtration is done!")
     return df
 
 #VCF file is 10 columns, bedpe output is 12 columns
@@ -153,7 +156,7 @@ def main(args):
 
     if  "naibr" in filerootname:
         if aa.quantile>0: 
-            print("naibr is in the file name, and perc in config file is not 0 ==> file will be filtered..")
+            print("naibr is in the file name, and perc in config file is not 0 ==> filtereing..")
             bedpelist = filter_naibr(bedpelist,aa.quantile)
         else:
             print("File is naibr but no quality filtration is applied on the list")
