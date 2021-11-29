@@ -143,6 +143,7 @@ def main(args):
     # Filters
     ##low quality
     bedpelist = bedpelist[bedpelist["filter"].str.find("LOWQ") == -1]
+    bedpelist = bedpelist[bedpelist["filter"].str.find("FAIL") == -1]
     
     ##type
     if aa.svtype:
