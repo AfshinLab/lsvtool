@@ -12,6 +12,8 @@ it compatible with SURVIVOR, with additional filtration of lengths and quality.
 
 import os, sys, vcf
 import pandas as pd
+import matplotlib
+import matplotlib.pyplot as plt
 
 def add_arguments(parser):
     # parser = argparse.ArgumentParser(
@@ -47,26 +49,27 @@ def check_ext(filename):
         sys.exit("input file is not vcf or vcf.gz")
 
 # naibr filter functionls
-def filter_naibr(df,quantile):
-    cuttoff=df.quality.quantile(q=quantile)
-    if str(cuttoff).isdigit():
+def filter_naibr(df, quantile, outputpath, file_name):
+    if pd.api.types.is_numeric_dtype(df.quality):
+        cuttoff=df.quality.quantile(q=quantile)
         print("The top ",round((1-quantile)*100), "% of the QC will be kept", sep="")
         print("Cut off set: ",cuttoff,sep="")
         df = df[df.quality >= cuttoff]
-    #     #hist = df.qual_score.hist(bins=df.shape[0])
-    #     matplotlib.use('Agg')
-    #     plt.hist(df.qual_score, bins=df.shape[0])
-    #     plt.axvline(x=cuttoff, color='r', linestyle='dashed', linewidth=1,
-    #                 label= round(cuttoff,2))
-    #     plt.legend(loc='upper right')
-    #     plt.xlim(0, 5000)
-    #     #plt.show(hist)
-    #     plt.savefig("{0}QC_filter_{1}.pdf".format(aa.output_dir,file_name))
-    #     plt.close()
+        #hist = df.qual_score.hist(bins=df.shape[0])
+        matplotlib.use('Agg')
+        plt.hist(df.quality, bins=df.shape[0])
+        plt.axvline(x=cuttoff, color='r', linestyle='dashed', linewidth=1,
+                     label= round(cuttoff,2))
+        plt.legend(loc='upper right')
+        plt.xlim(0, 5000)
+        #plt.show(hist)
+        plt.savefig("{0}QC_filter_{1}.pdf".format(outputpath,file_name))
+        plt.close()
         df = df[df.quality >= cuttoff]
     else:
         print("There is no values in quality column, no filtration is done!")
     return df
+
 
 #VCF file is 10 columns, bedpe output is 12 columns
 def vcf_to_bedpe(filename):
@@ -158,7 +161,7 @@ def main(args):
     if  "naibr" in filerootname:
         if aa.quantile>0: 
             print("naibr is in the file name, and perc in config file is not 0 ==> filtereing..")
-            bedpelist = filter_naibr(bedpelist,aa.quantile)
+            bedpelist = filter_naibr(bedpelist,aa.quantile,aa.output_dir,filerootname)
         else:
             print("File is naibr but no quality filtration is applied on the list")
 
