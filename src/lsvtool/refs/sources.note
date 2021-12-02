@@ -10,3 +10,6 @@ Centromers
 hg38:https://genome.ucsc.edu/cgi-bin/hgTables?hgsid=1223532593_DSGA3eePNlcwZpLeBIATMeH0iC5A&clade=mammal&org=Human&db=hg38&hgta_group=map&hgta_track=centromeres&hgta_table=0&hgta_regionType=genome&position=chrX%3A15%2C560%2C138-15%2C602%2C945&hgta_outputType=primaryTable&hgta_outFileName=cytoband_hg37
 hg37:https://genome.ucsc.edu/cgi-bin/hgTables?hgsid=1223532593_DSGA3eePNlcwZpLeBIATMeH0iC5A&clade=mammal&org=Human&db=hg19&hgta_group=map&hgta_track=cytoBand&hgta_table=0&hgta_regionType=genome&position=chrX%3A15%2C578%2C261-15%2C621%2C068&hgta_outputType=primaryTable&hgta_outFileName=cytoband_hg37
 
+
+White_lists
+hg37:https://ftp-trace.ncbi.nlm.nih.gov/ReferenceSamples/giab/data/AshkenazimTrio/analysis/NIST_SVs_Integration_v0.6/
