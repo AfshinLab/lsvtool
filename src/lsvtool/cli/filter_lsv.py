@@ -32,7 +32,7 @@ def add_arguments(parser):
         help="Remove SV with QC less than the quantile (for NAIBR only)")
     parser.add_argument("-d", "--max_distance", default=1000,type=int,
         help="Max distance between SV to be merged")
-    parser.add_argument("-bl", "--blacklists", default=None, type=str,
+    parser.add_argument("-bl", "--blacklists", default=None, type=str, 
         help="blacklist (regions to discard) 3-columns bed file(s) separated by commas (,) for more than one file! (no spaces) ")
     #todo type=list, action='append', nargs='+' 
     parser.add_argument("-wl", "--whitelists", default=None, type=str,
@@ -177,7 +177,7 @@ def main(args):
 
 ### Filter white and black lists from the merged file ###
     blacklist_code = ""
-    if aa.blacklists:
+    if aa.blacklists and aa.blacklists != "None":
         for file in aa.blacklists.split(","):
             if os.path.exists(file):
                 blacklist_code = blacklist_code + " -b " + file
@@ -186,7 +186,7 @@ def main(args):
         blacklist_code = blacklist_code + " "
 
     whitelist_code = ""
-    if aa.whitelists:
+    if aa.whitelists and aa.whitelists != "None":
         for file in aa.whitelists.split(","):
             if os.path.exists(file):
                 whitelist_code = whitelist_code + " -b " + file
@@ -194,7 +194,7 @@ def main(args):
                 print("File \"{}\" does not exist so it will be skipped".format(file))
         whitelist_code = whitelist_code + " "
 
-    if (blacklist_code):
+    if blacklist_code:
         os.system("bedtools intersect -v -a {0}_temp {1} > {0}_temp2".format(bedfile_merged,blacklist_code))
     else:
         os.system("cp {0}_temp {0}_temp2".format(bedfile_merged))
@@ -204,10 +204,14 @@ def main(args):
     else:
         os.system("cp {0}_temp2 {0}".format(bedfile_merged))
 
-
-    df = pd.read_csv(bedfile_merged,header=None, sep='\t')
-    df = bed_to_bedpe(df)
-    df.to_csv(bedpefile_merged, index=False, header=False, sep='\t')
+    try:
+        df = pd.read_csv(bedfile_merged,header=None, sep='\t')
+        df = bed_to_bedpe(df)
+        df.to_csv(bedpefile_merged, index=False, header=False, sep='\t')
+    except:
+        print("All SVs were filtered out!")
+        with open(bedpefile_merged, "w") as f:
+            f.write("#")
 
     os.system("SURVIVOR bedpetovcf {} {}_temp".format(bedpefile_merged, vcffile_merged))
     os.system("less {0}_temp | sed s'/STRANDS=[0-9][- 0-9];//'g > {0}".format(vcffile_merged))
