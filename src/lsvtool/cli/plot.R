@@ -46,9 +46,18 @@ print(comparison_matrix)
 system(comparison_matrix)
 
 #Plot comparison matrix
+
+if (file.info(paste0(file_name,"comparison_matrix.txt"))$size == 0 )
+{
+  stop("All values filtered out!")
+} 
+
+
 t=read.table(paste0(file_name,"comparison_matrix.txt"),header=F)
 dst <- data.matrix(t(t))
 pdf(file = paste0(file_name,"figures.pdf"))
+
+
 # image(1:nrow(dst), 1:ncol(dst),log(dst), col=rev(heat.colors(10)),axes=F, xlab="", ylab="")
 # grid(col='black',nx=nrow(dst),ny=ncol(dst),lty=1)
 
