@@ -9,22 +9,20 @@ The output will be: <br/>
     - Lists of bedpe files for common and uniq regions for the filtered inputs, which can be easily plotted on IGV.
     Addtionally, Batch files which can be used to blot the regions in IGV after loading the bam files of the reads.
 
-<br/><br/><br/>
 
 # Installation and Running
 The installation requires conda environment which will collect all the needed software. So, first make sure you have a working conda!
 ## Installation:
-<code>git clone https://github.com/HSiga/lsvtool.git <br/> 
-cd lsvtool  <br/>
-conda env create -n lsv2 --file env.yaml  <br/>
-conda activate lsv2  <br/>
-pip install .  <br/>
-lsvtool -h</code>
+<code>git clone https://github.com/HSiga/lsvtool.git </code><br/> 
+<code>cd lsvtool  </code><br/>
+<code>conda env create -n lsv2 --file env.yaml </code><br/>
+<code>conda activate lsv2  </code><br/>
+<code>pip install .  </code><br/>
+<code>lsvtool -h</code>
 
 ## Running analysis:
-<code>lsvtool init -i file1.vcf.gz file2.vcf.gz.. -o output_directory  <br/>
-
-cd output_directory </code>
+<code>lsvtool init -i file1.vcf.gz file2.vcf.gz.. -o output_directory </code><br/> 
+<code>cd output_directory </code>
 
 Then adjust the parameters in the config file, and finally.
 
