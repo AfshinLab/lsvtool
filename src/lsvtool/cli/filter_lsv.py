@@ -172,7 +172,10 @@ def main(args):
     vcffile_merged = aa.output_dir + filerootname + "_filtered_sorted_merged.vcf"
 
     df.to_csv(bedfile, index=None, header=None, sep='\t')
-    os.system("bedtools merge -i {} -c 4,5,6,7,8,9 -o first,collapse,max,mean,first,count -d {} > {}_temp".format(bedfile,aa.max_distance,bedfile_merged))
+    if aa.max_distance > 0:
+        os.system("bedtools merge -i {} -c 4,5,6,7,8,9 -o first,collapse,max,mean,first,count -d {} > {}_temp".format(bedfile,aa.max_distance,bedfile_merged))
+    else:
+        os.system("cp {} {}_temp".format(bedfile, bedfile_merged))
 
 
 ### Filter white and black lists from the merged file ###
