@@ -37,20 +37,30 @@ else:
 
 ids, = glob_wildcards("{id,[^/]+}.vcf.gz") 
 
-rule Final:
+rule final:
     input: 
         #expand("{filename}_filtered_sorted_merged.vcf",filename=ids),
         expand("merging/{perc}_{dist}_SVs_merged_list.bedpe",perc=perc,dist=dist),
         "to_igv_plot/common.batch"
-       
+
 
 rule filter_lsv_files:
     input:
         "{filename}.vcf.gz"
     output: 
         "filtered_inputs/{filename}_filtered_sorted_merged.vcf"
-    run:
-        shell("lsvtool filter_lsv  -f {input} -t {svtype} -q {perc} -d {dist} -m {minlength} -M {maxlength} -bl {defaultBlacklists} -wl {defaultWhitelist} -o filtered_inputs") 
+    shell:
+        "lsvtool filter_lsv"
+        " -f {input}"
+        " -t {svtype}"
+        " -q {perc}"
+        " -d {dist}"
+        " -m {minlength}"
+        " -M {maxlength}"
+        " -bl {defaultBlacklists}"
+        " -wl {defaultWhitelist}"
+        " -o filtered_inputs"
+
 
 rule merge_lsv_files:
     input: expand("filtered_inputs/{filename}_filtered_sorted_merged.vcf", filename=ids)
@@ -59,8 +69,9 @@ rule merge_lsv_files:
     params: 
         merge = "files_to_merge.txt"
     shell:
-        "cd filtered_inputs && ls *_filtered_sorted_merged.vcf > {params.merge}"
-        " && SURVIVOR merge {params.merge} {dist} 1 0 0 0 {minlength} ../{output}"
+        "cd filtered_inputs &&"
+        "ls *_filtered_sorted_merged.vcf > {params.merge} &&"
+        "SURVIVOR merge {params.merge} {dist} 1 0 0 0 {minlength} ../{output}"
 
 
 rule plot_intersection:
@@ -90,6 +101,7 @@ rule intersect_bedpe:
                 shell(f"less {input} | cut -f 1,2,5,12 | grep \'{i}\' | sed \'s/{i} /{lable}/g\' > to_igv_plot/{lable}.bedpe")
             except:
                 continue
+
 
 rule output_igv_batches:
     input: "to_igv_plot/{file}.bedpe"
