@@ -13,7 +13,7 @@ library("optparse")
 library("VennDiagram")
 
 option_list = list(
-  make_option(c("-i", "--input_vcf"), type="character",default="4_naibrs_merged.vcf", #NULL,
+  make_option(c("-i", "--input_vcf"), type="character", 
               help="merged VCF dataset input file name", metavar="character"),
   make_option(c("-t", "--type"), type="character", default=NULL,
 				      help="SV type to keep [DEL, DUP, INV] [default= %default]", metavar="character")
@@ -26,15 +26,17 @@ opt_parser = OptionParser(option_list=option_list);
 opt = parse_args(opt_parser);
 
 
-if (!is.na(opt$input_vcf)) {
+if (exists("snakemake")) { # If called from from snakemake
+  vcf_file <- snakemake@input[[1]]
+} else if (!is.na(opt$input_vcf)) {
   vcf_file <- opt$input_vcf
-  cat(sprintf("\nFile to be plotted:\n%s\n\n",opt$input_vcf))
-  file_name <- opt$input_vcf
-  file_name <- gsub('.{4}$', '_', file_name)
-  bedpeout <- paste0(file_name,"list.bedpe")
 } else {
   stop("date parameter must be provided. See script usage (--help)")
 }
+
+cat(sprintf("\nFile to be plotted:\n%s\n\n", vcf_file))
+file_name <- gsub('.{4}$', '_', vcf_file)
+bedpeout <- paste0(file_name,"list.bedpe")
 
 #Get samples names
 files_names <- system(sprintf("bcftools query -l %s",vcf_file),intern = T)

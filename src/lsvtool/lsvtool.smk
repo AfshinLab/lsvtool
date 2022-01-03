@@ -77,9 +77,8 @@ rule merge_lsv_files:
 rule plot_intersection:
     input: "merging/{perc}_{dist}_SVs_merged.vcf"
     output:"merging/{perc}_{dist}_SVs_merged_list.bedpe"
-    params: pkg_resources.resource_filename("lsvtool", "cli/plot.R")
-    shell: 
-        "Rscript {params} -i {input}"
+    script: 
+        "scripts/plot.R"
 
 
 rule intersect_bedpe:
