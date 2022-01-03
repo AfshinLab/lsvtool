@@ -10,7 +10,10 @@ it compatible with SURVIVOR, with additional filtration of lengths and quality.
 # output -> filtered VCF and bedpe file 
 ###
 
-import os, sys, vcf
+import os
+import sys
+
+import vcf
 import pandas as pd
 import matplotlib
 import matplotlib.pyplot as plt
