@@ -90,9 +90,6 @@ files_names <- gsub(x = files_names, pattern = "\\.BLR","",ignore.case = T)
 #remove the bedpe if not Naibr nor linkedSV
 files_names <- sub(x = files_names, pattern = ".bedpe","",ignore.case = T) 
 
-#make new lines for every dot
-files_names <- gsub(x = files_names, pattern = "[\\._]","\n",ignore.case = T)
-
 #Extract list of shared regions
 intersection_list <- paste0(file_name,"intersection_matrix.txt")
 perl_code <- sprintf( 'perl -ne \'print "$1\\n" if /SUPP_VEC=([^,;]+)/\' %s | sed -e \'s/\\(.\\)/\\1 /g\' > %s',
@@ -133,12 +130,12 @@ venn.diagram(list_to_plot, output=True,
             fill = myfill ,
             alpha = rep(0.5,number_of_samples),
             cex = .5, #size numbers
-            lty = 4, #dotted line
-            lwd = .2, #thickness
+            #lty = 4, #dotted line
+            lwd = .5, #thickness
             #Set names
-            cat.cex = 0.3,
+            cat.cex = 0.6,
             cat.default.pos = "outer", #or text
-            cat.dist = 0
+            cat.dist = 0.05
           );
 
 system(sprintf("rm %s",intersection_list))
