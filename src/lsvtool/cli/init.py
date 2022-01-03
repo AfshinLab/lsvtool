@@ -6,58 +6,74 @@ import os
 import os.path
 import sys
 from pathlib import Path
+from typing import List, Any
+import shutil
 
 import pkg_resources
 
 logger = logging.getLogger(__name__)
 
+CONFIG_FILE_NAME = "parameters.config"
 ACCEPTED_FILE_EXT = (".vcf", ".vcf.gz")
 
 def add_arguments(parser):
     parser.add_argument(
-        "-i", "--input_bedpe", type=list, action='append', nargs='+',
+        "-i", "--input-vcfs", type=Path, nargs='*', required=True,
         help="input vcf file(s) separated by spaces, to perform the filteration and intersection "
              "detected in the same directory"
     )
     parser.add_argument(
-        "-o", "--out_directory", type=Path,
+        "-o", "--out_directory", type=Path, required=True,
         help="New analysis directory to create"
+    )
+    parser.add_argument(
+        "-s", "--sample-names", nargs="*", 
+        help="sample names to use for each input file separated by spaces. Otherwise input file "
+             "names are used."
     )
 
 
 def main(args):
-    init(args.input_bedpe, args.out_directory)
-    config_file = pkg_resources.resource_filename("lsvtool","/cli/parameters.config")
-    os.system("cp {} {}/parameters.config".format(config_file, args.out_directory))
-    
-def init(bedpe: list, directory: Path):
-    bedpe = [''.join([str(elem) for elem in i]) for i in bedpe[0]]
+    init(vcfs = args.input_vcfs, directory = args.out_directory, sample_names = args.sample_names)
 
+
+def init(vcfs: List[Path], directory: Path, sample_names: List[str] = None):
     if " " in str(directory):
         logger.error("The name of the analysis directory must not contain spaces")
         sys.exit(1)
 
-    create_and_populate_analysis_directory(bedpe, directory)
+    if len(vcfs) < 2:
+        logger.error("Please provide more than one VCF.")
+        sys.exit(1)
+    
+    if sample_names is None:
+        sample_names = [vcf.name.replace(".vcf.gz", "").replace(".vcf", "") for vcf in vcfs]
+    else:
+        assert len(sample_names) == len(vcfs), "Provide one sample name for each input file!"
+    
+    create_and_populate_analysis_directory(vcfs, directory, sample_names)
 
     logger.info(f"Directory {directory} initialized.")
     logger.info(f"To start the analysis: 'cd {directory} && lsvtool run' ")
 
 
-def create_and_populate_analysis_directory(bedpe: list, directory: Path):
+def create_and_populate_analysis_directory(vcfs: List[Path], directory: Path, sample_names: List[str]):
     try:
         directory.mkdir()
     except OSError as e:
         logger.error(e)
         sys.exit(1)
 
-    for bedpe_file in bedpe:
-        print(bedpe_file)
-        bedpe_file = Path(bedpe_file)
-        fail_if_inaccessible(bedpe_file)
-        create_symlink(bedpe_file, directory, bedpe_file)
+    # Copy default configs
+    config_file = pkg_resources.resource_filename("lsvtool", CONFIG_FILE_NAME)
+    shutil.copy(config_file, directory)
+
+    for vcf, name in zip(vcfs, sample_names):
+        fail_if_inaccessible(vcf)
+        create_symlink(vcf, directory, name)
 
 
-def fail_if_inaccessible(path):
+def fail_if_inaccessible(path: Path):
     try:
         with path.open():
             pass
@@ -66,16 +82,24 @@ def fail_if_inaccessible(path):
         sys.exit(1)
 
 
-def create_symlink(readspath, dirname, target):
-    if not os.path.isabs(readspath):
-        src = os.path.relpath(readspath, dirname)
+def create_symlink(source: Path, dirname: Path, target: str):
+    if not os.path.isabs(source):
+        src = os.path.relpath(source, dirname)
     else:
-        src = readspath
+        src = source
 
     # Check if file has the correct extension
-    if not str(readspath).endswith(ACCEPTED_FILE_EXT):
-        raise FileNotFoundError(f"File {readspath} is not accepted input.")
+    if not str(source).endswith(ACCEPTED_FILE_EXT):
+        raise FileNotFoundError(f"File {source} is not accepted input.")
 
-    os.symlink(src, os.path.join(dirname, target))
+    ext = ".vcf.gz" if source.match("*.vcf.gz") else ".vcf"
+    dest = dirname / f"{target}{ext}"
+
+    logger.info(f"Creating symlink for file {source} --> {dest}")
+    try:
+        os.symlink(src, dest)
+    except FileExistsError as e:
+        logger.error("%s: Try to supply a custom names using -s/--sample-names", e)
+        sys.exit(1) 
 
 
