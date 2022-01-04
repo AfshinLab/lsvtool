@@ -13,11 +13,14 @@ it compatible with SURVIVOR, with additional filtration of lengths and quality.
 import os
 import sys
 from pathlib import Path
+import logging
 
 import vcf
 import pandas as pd
 import matplotlib
 import matplotlib.pyplot as plt
+
+logger = logging.getLogger(__name__)
 
 
 def add_arguments(parser):
@@ -75,34 +78,53 @@ def filter_naibr(df, quantile, outputpath, file_name):
 
 #VCF file is 10 columns, bedpe output is 12 columns
 def vcf_to_bedpe(filename):
-        vcflist = vcf.Reader(filename=filename)
-        bedpelist = []
-        for record in vcflist:
-                if record.start < 0:
-                        record.start = 0
-                if not record.FILTER:
-                        record.FILTER = "."
-                if record.CHROM.isdigit() or record.CHROM.lower() in ['x','y'] :
-                        record.CHROM = "chr" + record.CHROM
-                try:
-                        newline=[record.CHROM,record.start,record.end,
-                                record.CHROM,record.INFO['END'],record.INFO['END']+1,
-                                record.var_subtype, record.ID, record.INFO['END']-record.start, record.QUAL,
-                                "_".join(record.FILTER),record.INFO]
-                except:
-                        continue
-                bedpelist.append(newline)
-        bedpelist = pd.DataFrame(bedpelist,columns=["#chr","start1","end1",
-                                            "chr","start2","end2",
-                             "type","ID","length","quality","filter","INFO"])
-        
-        return bedpelist
+    reader = vcf.Reader(filename=filename)
+    if "END" not in reader.infos:
+        logger.warning("Missing END information in VCF header")
+
+    bedpelist = []
+    for record in reader:
+        if record.start < 0:
+            record.start = 0
+
+        # Keep records with PASS (returns FILTER as empty list) or '.'
+        if record.FILTER and "." not in record.FILTER:
+            continue
+
+        if record.CHROM.isdigit() or record.CHROM.lower() in ['x','y'] :
+            record.CHROM = "chr" + record.CHROM
+
+        if "END" not in record.INFO:
+            logger.debug(f"Record missing 'END' in info: {record}")
+            continue
+
+        newline = [
+            record.CHROM,
+            record.start,
+            record.end,
+            record.CHROM,
+            record.INFO['END'],
+            record.INFO['END']+1,
+            record.var_subtype, 
+            record.ID, 
+            record.INFO['END']-record.start, # Length
+            record.QUAL,
+            ",".join(record.FILTER),
+            record.INFO
+        ]
+        bedpelist.append(newline)
+    bedpelist = pd.DataFrame(bedpelist, columns=["#chr","start1","end1", "chr","start2","end2",
+                                                 "type","ID","length","quality","filter","INFO"])
+    
+    return bedpelist
+
 
 ### The following 2 functions are only for deletions, inversion and duplication,
 ### with an assumption that start1 = end1, start2 = end2, chr1 = chr2
 def bedpe_to_bed(df):
     df2 = pd.concat([df.iloc[:,0:2], df.iloc[:,5], df.iloc[:,6:]], axis=1)
     return(df2)
+
 
 def bed_to_bedpe(df):
     df2 = pd.concat([df.iloc[:,0:2], df.iloc[:,1]+1,df.iloc[:,0], df.iloc[:,2],df.iloc[:,2]+1,
@@ -111,6 +133,7 @@ def bed_to_bedpe(df):
     col_names[0:6] = ["chrom1", "start1", "stop1", "chrom2", "start2", "stop2"]
     df2.columns = col_names
     return(df2)
+
 
 def sort_natural(df):
     x = list(range(1, 23))
@@ -137,11 +160,6 @@ def main(args):
     bedpelist = vcf_to_bedpe(args.file_name)
 
     bedpelist = sort_natural(bedpelist)
-    
-    # Filters
-    ##low quality
-    bedpelist = bedpelist[bedpelist["filter"].str.find("LOWQ") == -1]
-    bedpelist = bedpelist[bedpelist["filter"].str.find("FAIL") == -1]
     
     ##type
     if args.svtype:
