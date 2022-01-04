@@ -12,6 +12,7 @@ it compatible with SURVIVOR, with additional filtration of lengths and quality.
 
 import os
 import sys
+from pathlib import Path
 
 import vcf
 import pandas as pd
@@ -20,25 +21,25 @@ import matplotlib.pyplot as plt
 
 
 def add_arguments(parser):
-    parser.add_argument( "-f", "--file_name", default=None,
+    parser.add_argument( "-f", "--file_name", required=True,
         help="vcf file")
-    parser.add_argument("-t", "--svtype", default=None,
+    parser.add_argument("-t", "--svtype",
         help="SV type to keep [DEL, DUP, INV]")
     parser.add_argument("-M", "--maxlength", default=10000000,type=int,
-        help="Max SV length to keep")
+        help="Max SV length to keep. Default: %(default)s")
     parser.add_argument("-m", "--minlength", default=1000,type=int,
-        help="Min SV length to keep")
+        help="Min SV length to keep. Default: %(default)s")
     parser.add_argument("-q", "--quantile", default=0.5, type=float,
-        help="Remove SV with QC less than the quantile (for NAIBR only)")
+        help="Remove SV with QC less than the quantile (for NAIBR only). Default: %(default)s")
     parser.add_argument("-d", "--max_distance", default=1000,type=int,
-        help="Max distance between SV to be merged")
-    parser.add_argument("-bl", "--blacklists", default=None, type=str, 
+        help="Max distance between SV to be merged. Default: %(default)s")
+    parser.add_argument("-bl", "--blacklists",
         help="blacklist (regions to discard) 3-columns bed file(s) separated by commas (,) for more than one file! (no spaces) ")
     #todo type=list, action='append', nargs='+' 
-    parser.add_argument("-wl", "--whitelists", default=None, type=str,
+    parser.add_argument("-wl", "--whitelists",
         help="whitelist (regions to only include) 3-columns bed file(s) separated by commas (,) for more than one file! (no spaces) ")
-    parser.add_argument("-o", "--output_dir", default=".", type=str,
-        help="Output directory, Default is out ")
+    parser.add_argument("-o", "--output_dir", default=Path().cwd(), type=Path,
+        help="Output directory, Default: %(default)s (CWD)")
 
 
 # Converting functions
@@ -122,14 +123,9 @@ def sort_natural(df):
 
 
 def main(args):
+    print(vars(args))
     filerootname = args.file_name.replace(".vcf.gz","").replace(".vcf","")
-    
-    # make the code for blacklists files
-    if not str(args.output_dir).endswith("/"):
-        args.output_dir = args.output_dir + "/"
-
-    if not os.path.exists(args.output_dir):
-        os.makedirs(args.output_dir)
+    args.output_dir.mkdir(exist_ok=True)
 
     # START:
     ########
@@ -165,10 +161,10 @@ def main(args):
             print("File is naibr but no quality filtration is applied on the list")
 
     df = bedpe_to_bed(bedpelist)
-    bedfile = args.output_dir + filerootname + "_filtered_sorted.bed"
-    bedfile_merged = args.output_dir + filerootname + "_filtered_sorted_merged.bed"
-    bedpefile_merged = args.output_dir + filerootname + "_filtered_sorted_merged.bedpe"
-    vcffile_merged = args.output_dir + filerootname + "_filtered_sorted_merged.vcf"
+    bedfile = args.output_dir / f"{filerootname}_filtered_sorted.bed"
+    bedfile_merged = args.output_dir / f"{filerootname}_filtered_sorted_merged.bed"
+    bedpefile_merged = args.output_dir / f"{filerootname}_filtered_sorted_merged.bedpe"
+    vcffile_merged = args.output_dir / f"{filerootname}_filtered_sorted_merged.vcf"
 
     df.to_csv(bedfile, index=None, header=None, sep='\t')
     if args.max_distance > 0:
@@ -179,7 +175,7 @@ def main(args):
 
     ### Filter white and black lists from the merged file ###
     blacklist_code = ""
-    if args.blacklists and args.blacklists != "None":
+    if args.blacklists is None:
         for file in args.blacklists.split(","):
             if os.path.exists(file):
                 blacklist_code = blacklist_code + " -b " + file
@@ -188,7 +184,7 @@ def main(args):
         blacklist_code = blacklist_code + " "
 
     whitelist_code = ""
-    if args.whitelists and args.whitelists != "None":
+    if args.whitelists is None:
         for file in args.whitelists.split(","):
             if os.path.exists(file):
                 whitelist_code = whitelist_code + " -b " + file
