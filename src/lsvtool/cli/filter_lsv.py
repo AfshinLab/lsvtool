@@ -83,7 +83,9 @@ def vcf_to_bedpe(filename):
         logger.warning("Missing END information in VCF header")
 
     bedpelist = []
+    n_records = 0
     for record in reader:
+        n_records += 1
         if record.start < 0:
             record.start = 0
 
@@ -113,6 +115,9 @@ def vcf_to_bedpe(filename):
             record.INFO
         ]
         bedpelist.append(newline)
+    print(f"Records in VCF: {n_records:,}")
+    print(f"Records translated: {len(bedpelist):,}")
+
     bedpelist = pd.DataFrame(bedpelist, columns=["#chr","start1","end1", "chr","start2","end2",
                                                  "type","ID","length","quality","filter","INFO"])
     
@@ -164,12 +169,14 @@ def main(args):
     ##type
     if args.svtype:
         bedpelist = bedpelist[bedpelist.type == args.svtype]
-    
+        print(f"Records with type == {args.svtype}: {len(bedpelist):,}")
     if args.maxlength:
         bedpelist = bedpelist[bedpelist["length"]<=args.maxlength]
+        print(f"Records with length <= {args.maxlength}: {len(bedpelist):,}")
     
     if args.minlength:    
         bedpelist = bedpelist[bedpelist["length"]>=args.minlength]
+        print(f"Records with length >= {args.minlength}: {len(bedpelist):,}")
 
     if  "naibr" in filerootname:
         if args.quantile>0: 

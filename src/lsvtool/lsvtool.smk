@@ -49,6 +49,7 @@ rule filter_lsv_files:
         "{filename}.vcf.gz"
     output: 
         "filtered_inputs/{filename}_filtered_sorted_merged.vcf"
+    log: "filtered_inputs/{filename}_filtered_sorted_merged.vcf.log"
     shell:
         "lsvtool filter_lsv"
         " -f {input}"
@@ -59,7 +60,7 @@ rule filter_lsv_files:
         " -M {maxlength}"
         " -bl {defaultBlacklists}"
         " -wl {defaultWhitelist}"
-        " -o filtered_inputs"
+        " -o filtered_inputs > {log}"
 
 
 rule merge_lsv_files:
