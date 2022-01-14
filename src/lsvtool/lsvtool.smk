@@ -1,112 +1,354 @@
-## The pipe will start with bedpe inputs
-
-import pkg_resources
 import glob
-import numpy as np
- 
+from itertools import product
+
 configfile: "parameters.config"
-perc=config["perc"]
-svtype=config["svtype"]
-dist=config["dist"]
-minlength=config["minlength"]
-maxlength=config["maxlength"]
-refgenome=config["refgenome"]
-BL=config['BL']
-WL=config['WL']
 
-print(config['BL'])
+svtype=config.get("svtype", "ALL")
+dist=config.get("dist", 1000)
+minlength=config.get("minlength", 0)
+maxlength=config.get("maxlength", 1_000_000)
+BL=config.get('BL')
+segdups=config.get('segdups')
 
-#Dedfault Black list
-if refgenome in ['hg38', 'hg19'] and BL:
-    print("Black list filtration is applied!")
-    gap_bed = pkg_resources.resource_filename("lsvtool", "refs/{}_gap.bed".format(refgenome))
-    centromers_bed = pkg_resources.resource_filename("lsvtool", "refs/{}_centromers.bed".format(refgenome))
-    blacklist_bed = pkg_resources.resource_filename("lsvtool", "refs/{}_black_list.bed".format(refgenome))
-    defaultBlacklists = f"{blacklist_bed},{gap_bed},{centromers_bed}"
-else:
-    defaultBlacklists= None
-    print("No black list filtration!")
+bench_bed=config.get('bench_bed')
+bench_vcf=config.get('bench_vcf')
 
-if WL:
-    print("White list filtration is applied!")
-    defaultWhitelist = pkg_resources.resource_filename("lsvtool", "refs/HG002_SVs_Tier1plusTier2_v0.6.1.bed")
-else:
-    print("No white list filtration!")  
-    defaultWhitelist = None
+segdups_dist=20_000  # 20kbp is used by longranger (see https://github.com/10XGenomics/longranger/blob/e2a3143b3956af6290fd4ba08e09f76985293685/mro/_combined_sv_caller.mro#L91)
 
+ids = glob_wildcards("{id,[^/]+}.vcf.gz").id 
 
-ids, = glob_wildcards("{id,[^/]+}.vcf.gz") 
+expected_files = ["".join(p) for p in product("01", repeat=len(ids))]
+expected_files.remove("1"*len(ids))  # Called 'common'
+expected_files.remove("0"*len(ids))  # No calls
+expected_files.append("common")
+
+final_input = [
+    expand("filtered/{filename}.final.bedpe", filename=ids),
+    expand("filtered/{filename}.final.vcf.gz.tbi", filename=ids),
+    expand("to_igv_plot/{files}.batch", files=expected_files),
+    "merged/merged.vcf",
+    "merged/merged_comp_mat_heatmap.png",
+    "merged/merged_comp_mat_jaccard_heatmap.png",
+    "merged/merged_venn.png",
+    "to_igv_plot/README.md"
+]
+
+if bench_bed and bench_vcf:
+    final_input.extend([
+        expand("bench/{filename}", filename=ids)
+    ])
+
 
 rule final:
     input: 
-        #expand("{filename}_filtered_sorted_merged.vcf",filename=ids),
-        expand("merging/{perc}_{dist}_SVs_merged_list.bedpe",perc=perc,dist=dist),
-        "to_igv_plot/common.batch"
+        final_input
 
 
-rule filter_lsv_files:
+rule get_blacklist:
+    """Setup blacklist, merge multple if provided"""
+    output:
+        bed = "blacklist.bed"
+    run:
+        if not BL:
+            shell("touch {output.bed}")
+        else:
+            files = BL.split(",")
+            if len(files) == 1:
+                shell("ln -s {files[0]} {output.bed}")
+            else: # Concat multiple
+                file_str = " ".join(files)
+                shell("cat {file_str} > {output.bed}")
+
+
+rule bgzip:
     input:
-        "{filename}.vcf.gz"
-    output: 
-        "filtered_inputs/{filename}_filtered_sorted_merged.vcf"
-    log: "filtered_inputs/{filename}_filtered_sorted_merged.vcf.log"
+        vcf = "{file}.vcf"
+    output:
+        vcf = "{file}.vcf.gz"
     shell:
-        "lsvtool filter_lsv"
-        " -f {input}"
-        " -t {svtype}"
-        " -q {perc}"
-        " -d {dist}"
-        " -m {minlength}"
-        " -M {maxlength}"
-        " -bl {defaultBlacklists}"
-        " -wl {defaultWhitelist}"
-        " -o filtered_inputs > {log}"
+        "bgzip -c {input.vcf} > {output.vcf}"
+
+
+rule tabix:
+    input:
+        vcf = "{file}.vcf.gz"
+    output:
+        vcf = "{file}.vcf.gz.tbi"
+    shell:
+        "tabix -p vcf {input.vcf}"
+
+
+rule select:
+    """Select variants of correct type that passed filters"""
+    input:
+        vcf = "{filename}.vcf.gz"
+    output:
+        vcf = "selected/{filename}.vcf"
+    params: 
+        select = '' if svtype == "ALL" else f"-i 'INFO/SVTYPE == \"{svtype}\"'" 
+    shell:
+        "bcftools view -f 'PASS,.' {params.select} {input.vcf} > {output.vcf}"
+
+
+rule collapse:
+    """Collapse variants of similar size and breakpoints"""
+    input:
+        vcf = "selected/{filename}.vcf.gz",
+        index = "selected/{filename}.vcf.gz.tbi",
+    output:
+        vcf = "collapsed/{filename}.vcf",
+        removed = "collapsed/{filename}.removed.vcf"
+    log: "collapsed/{filename}.vcf.log"
+    params:
+        sizemin = int(minlength * 0.8)
+    run:
+        command = (
+            "truvari collapse"
+            " --input {input.vcf}"
+            " --collapsed-output {output.removed}"
+            " --keep *"
+            " --chain"
+            " --pctsim 0"
+            " --pctovl 0.8"
+            " --pctsize 0.8"
+            " --passonly"
+            " --refdist {dist}"
+            " --sizemin {params.sizemin}"
+            " --sizemax {maxlength}"
+            " 2> {log}"
+            " |"
+            " bcftools sort -"
+            " > {output.vcf}"
+            " 2>> {log}")
+        try: # Try taking the SV with max quality if quality provided
+            shell(command.replace("*", "maxqual"))
+        except:
+            shell(command.replace("*", "first"))
+
+
+rule filter_blacklist:
+    """Filter SVs against blacklist and for size"""
+    input:
+        vcf = "collapsed/{filename}.vcf",
+        blacklist = "blacklist.bed"
+    output:
+        vcf = "filtered/{filename}.vcf"
+    log: "filtered/{filename}.vcf.log"
+    shell:
+        "SURVIVOR filter"
+        " {input.vcf}"
+        " {input.blacklist}"
+        " {minlength}"
+        " {maxlength}"
+        " -1"
+        " -1"
+        " {output.vcf}"
+        " > {log}"
+
+
+rule filter_segdups:
+    """Filter SVs for overlap with segmental duplications if provided"""
+    input:
+        vcf = "filtered/{filename}.vcf"
+    output:
+        vcf = "filtered/{filename}.final.vcf"
+    log: "filtered/{filename}.final.vcf.log"
+    run:
+        if segdups:
+            shell(
+                "lsvtool intersect_bedpe"
+                " {input.vcf}"
+                " {segdups}"
+                " -o {output.vcf}"
+                " -d {segdups_dist}" 
+                " 2> {log}"
+            )
+        else:
+            shell("ln -s {input.vcf} {output.vcf}")
+
+
+rule vcftobedpe:
+    """Comman 'SURVIVOR vcftobed' acctually outputs BEDPE"""
+    input:
+        vcf = "{filename}.vcf"
+    output:
+        bedpe = "{filename}.bedpe"
+    shell:
+        "SURVIVOR vcftobed"
+        " {input.vcf}"
+        " -1"
+        " -1"
+        " {output.bedpe}"
 
 
 rule merge_lsv_files:
-    input: expand("filtered_inputs/{filename}_filtered_sorted_merged.vcf", filename=ids)
+    """Merge SV between multiple VCF to find common variants"""
+    input: 
+        vcfs = expand("filtered/{filename}.final.vcf", filename=ids)
     output: 
-        "merging/{perc}_{dist}_SVs_merged.vcf"
-    params: 
-        merge = "files_to_merge.txt"
+        vcf = temp("merged/merged_no_names.vcf"),
+        list = "merged/files_merged.list"
+    log: "merged/merged_no_names.vcf.log"
+    run:
+        with open(output.list, "w") as f:
+            f.writelines("\n".join(input.vcfs) + "\n")
+
+        shell("SURVIVOR merge"
+              " {output.list}"
+              " {dist}"
+              " 1"
+              " 0"
+              " 0"
+              " 0"
+              " {minlength}"
+              " {output.vcf}"
+              " > {log}")
+
+
+rule reheader:
+    """Add correct sample names to files"""
+    input:
+        vcf = "merged/merged_no_names.vcf"
+    output:
+        vcf = "merged/merged.vcf",
+        list = "merged/sample_names.list"
+    run:
+        with open(output.list, "w") as f:
+            f.writelines("\n".join(ids) + "\n")
+        shell("bcftools reheader -s {output.list} {input.vcf} > {output.vcf}")
+
+
+rule gencomp:
+    """Compare SVs between sample and output comparison matrix"""
+    input:
+        vcf = "merged/merged.vcf"
+    output:
+        txt = "merged/merged_comp_mat.txt"
     shell:
-        "cd filtered_inputs &&"
-        "ls *_filtered_sorted_merged.vcf > {params.merge} &&"
-        "SURVIVOR merge {params.merge} {dist} 1 0 0 0 {minlength} ../{output}"
+        "SURVIVOR genComp {input.vcf} 0 {output.txt}"
 
 
-rule plot_intersection:
-    input: "merging/{perc}_{dist}_SVs_merged.vcf"
-    output:"merging/{perc}_{dist}_SVs_merged_list.bedpe"
-    script: 
-        "scripts/plot.R"
+rule plot_heatmap:
+    """Plot matrix as heatmap"""
+    input:
+        "merged/merged_comp_mat.txt",
+        "merged/sample_names.list"
+    output:
+        "merged/merged_comp_mat_heatmap.png",
+        "merged/merged_comp_mat_jaccard_heatmap.png",
+    script:
+        "scripts/plot_heatmap.R"
+
+
+rule intersection:
+    """For each SV list the samples it appears for"""
+    # Code from https://github.com/fritzsedlazeck/SURVIVOR/wiki#plotting-the-comparison-of-multiple-input-vcf-files-after-merging
+    input:
+        "merged/merged.vcf"
+    output:
+        "merged/merged_intersection.txt"
+    shell:
+        "perl -ne \'print \"$1\\n\" if /SUPP_VEC=([^,;]+)/\' {input} | sed -e \'s/\\(.\\)/\\1 /g\' > {output}"
+
+
+rule plot_venn:
+    """Plot venn-diagram of SVs"""
+    input:
+        "merged/merged_intersection.txt",
+        "merged/sample_names.list"
+    output:
+        "merged/merged_venn.png",
+    params:
+        svtype = svtype
+    script:
+        "scripts/plot_venn.R"
+
+
+ruleorder: intersect_bedpe > vcftobedpe
 
 
 rule intersect_bedpe:
-    input: expand("merging/{perc}_{dist}_SVs_merged_list.bedpe", perc=perc,dist=dist)
-    output: "to_igv_plot/{files}.bedpe"
+    # Attach intersection info to BEDPE
+    input: 
+        bedpe = "merged/merged.bedpe",
+        intersection = "merged/merged_intersection.txt",
+    output: 
+        joint_bedpe = "merged/merge_intersection.bedpe",
+    shell:
+        "paste {input.bedpe} {input.intersection} > {output.joint_bedpe}"
+
+
+rule get_igv_regions:
+    input:
+        bedpe = "merged/merge_intersection.bedpe",
+    output:
+        bed = touch("to_igv_plot/{files}.bed")
     run:
-        n = len(ids)
-        xx = np.zeros((n,n))
-        for i in range (0,n):
-            xx[i,i]=1
-        xx = np.vstack( [xx,np.ones((n))] )
-        combinations = [' '.join(c for c in str(xx[line]) if c.isdigit()) for line in range (0,n+1)]
-        
-        for i in combinations :
-            lable=i.replace(" ", "")
-            if not "0" in lable :
-                lable="common"
-            try:
-                shell(f"less {input} | cut -f 1,2,5,12 | grep \'{i}\' | sed \'s/{i} /{lable}/g\' > to_igv_plot/{lable}.bedpe")
-            except:
-                continue
+        lable=wildcards.files
+        i = " ".join(list(lable))
+        if lable == "common":
+            i = " ".join(list("1"*len(ids)))
+        shell(f"cut -f 1,2,5,12 {input.bedpe} | grep \'{i} $\' | sed \'s/{i} /{lable}/g\' > {output.bed}")
 
 
 rule output_igv_batches:
-    input: "to_igv_plot/{file}.bedpe"
-    output:  "to_igv_plot/{file}.batch"
+    input: 
+        bed = "to_igv_plot/{file}.bed"
+    output: 
+        batch = "to_igv_plot/{file}.batch"
+    shell:
+        "bedtools igv -i {input.bed} -slop 1000 -clps -name | sed \'s/collapse/squish/g\' > {output.batch}"
+
+
+rule to_igv_plot_readme:
+    output:
+        "to_igv_plot/README.md"
     run:
-        for file in glob.glob("to_igv_plot/*bedpe"):
-            fileout = file.rsplit('.', 1)[0] + '.batch' 
-            shell("bedtools igv -i {file} -slop 1000 -clps -name | sed \'s/collapse/squish/g\' > {fileout}")
+        with open(output[0], "w") as fout:
+            print("""
+This directory contains to BED and BATCH files useful to visualize and compare SV found 
+in different samples.
+
+BED files (`*.bed`) contain regions for SV calls. 
+
+BATCH files (`*.batch`) contain scripts to generate images of said regions within a IGV session.
+
+See table below for which files contain which sets.
+""", file=fout)
+            wcol = max(map(len, ids)) + 2
+            wname = max(max(map(len, expected_files)) + 1, 7)
+            true_str = "X".center(wcol, " ")
+            false_str = " "*wcol
+            print("Prefix".ljust(wname, " "), *[i.center(wcol, " ") for i in ids], file=fout)
+            for file in expected_files:
+                if file == "common":
+                    cols = [true_str] * len(ids)
+                else:
+                    cols = [true_str if char == "1" else false_str for char in list(file)]
+                print(file.ljust(wname, " "), *cols, file=fout)
+
+
+rule bench:
+    input:
+        vcf = "filtered/{file}.final.vcf.gz"
+    output:
+        dir = directory("bench/{file}")
+    log: "bench/{file}.log"
+    params:
+        sizefilt = int(minlength * 0.6)
+    shell:
+        "truvari bench"
+        " --base {bench_vcf}"
+        " --comp {input.vcf}"
+        " --output {output.dir}"
+        " --sizefilt {params.sizefilt}"
+        " --sizemin {minlength}"
+        " --sizemax {maxlength}" 
+        " --includebed {bench_bed}"
+        " --giabreport"
+        " --refdist 2000"
+        " --chunksize 3000"
+        " --pctsim 0"
+        " --pctsize 0.7"
+        " --passonly"
+        " 2> {log}"

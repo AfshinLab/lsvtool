@@ -21,6 +21,8 @@ def main() -> int:
                         datefmt='%Y-%m-%d %H:%M:%S')
     parser = ArgumentParser(description=__doc__, prog="lsvtool")
     parser.add_argument("--version", action="version", version="%(prog)s 0.1")
+    parser.add_argument("--debug", action="store_true", default=False,
+                        help="Print debug messages")
     subparsers = parser.add_subparsers()
 
     # Import each module that implements a subcommand and add a subparser for it.
@@ -37,11 +39,22 @@ def main() -> int:
         module.add_arguments(subparser)
 
     args = parser.parse_args()
+
+    if args.debug:
+        root = logging.getLogger()
+        root.setLevel(logging.DEBUG)
+
     if not hasattr(args, "module"):
         parser.error("Please provide the name of a subcommand to run")
     else:
         module = args.module
         del args.module
+
+        # Print settings for module
+        sys.stderr.write(f"SETTINGS FOR: {module.__name__.split('.')[-1]}\n")
+        for object_variable, value in vars(args).items():
+            sys.stderr.write(f" {object_variable}: {value}\n")
+
         module.main(args)
 
     return 0

@@ -6,7 +6,7 @@ import os
 import os.path
 import sys
 from pathlib import Path
-from typing import List, Any
+from typing import List
 import shutil
 
 import pkg_resources
@@ -16,25 +16,30 @@ logger = logging.getLogger(__name__)
 CONFIG_FILE_NAME = "parameters.config"
 ACCEPTED_FILE_EXT = (".vcf", ".vcf.gz")
 
+
 def add_arguments(parser):
     parser.add_argument(
         "-i", "--input-vcfs", type=Path, nargs='*', required=True,
-        help="input vcf file(s) separated by spaces, to perform the filteration and intersection "
-             "detected in the same directory"
+        help="input vcf file(s) separated by spaces, to perform the filteration and "
+             "intersection detected in the same directory"
     )
     parser.add_argument(
         "-o", "--out_directory", type=Path, required=True,
         help="New analysis directory to create"
     )
     parser.add_argument(
-        "-s", "--sample-names", nargs="*", 
-        help="sample names to use for each input file separated by spaces. Otherwise input file "
-             "names are used."
+        "-s", "--sample-names", nargs="*",
+        help="sample names to use for each input file separated by spaces. Otherwise "
+             "input file names are used."
     )
 
 
 def main(args):
-    init(vcfs = args.input_vcfs, directory = args.out_directory, sample_names = args.sample_names)
+    init(
+        vcfs=args.input_vcfs,
+        directory=args.out_directory,
+        sample_names=args.sample_names
+    )
 
 
 def init(vcfs: List[Path], directory: Path, sample_names: List[str] = None):
@@ -45,19 +50,20 @@ def init(vcfs: List[Path], directory: Path, sample_names: List[str] = None):
     if len(vcfs) < 2:
         logger.error("Please provide more than one VCF.")
         sys.exit(1)
-    
+
     if sample_names is None:
-        sample_names = [vcf.name.replace(".vcf.gz", "").replace(".vcf", "") for vcf in vcfs]
+        sample_names = [vcf.name.replace(".vcf.gz", "").replace(".vcf", "") for vcf in vcfs]  # noqa: E501
     else:
-        assert len(sample_names) == len(vcfs), "Provide one sample name for each input file!"
-    
+        assert len(sample_names) == len(vcfs), "One name per input file!"
+
     create_and_populate_analysis_directory(vcfs, directory, sample_names)
 
     logger.info(f"Directory {directory} initialized.")
     logger.info(f"To start the analysis: 'cd {directory} && lsvtool run' ")
 
 
-def create_and_populate_analysis_directory(vcfs: List[Path], directory: Path, sample_names: List[str]):
+def create_and_populate_analysis_directory(vcfs: List[Path], directory: Path,
+                                           sample_names: List[str]):
     try:
         directory.mkdir()
     except OSError as e:
@@ -100,6 +106,4 @@ def create_symlink(source: Path, dirname: Path, target: str):
         os.symlink(src, dest)
     except FileExistsError as e:
         logger.error("%s: Try to supply a custom names using -s/--sample-names", e)
-        sys.exit(1) 
-
-
+        sys.exit(1)
