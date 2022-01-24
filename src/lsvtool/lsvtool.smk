@@ -86,16 +86,19 @@ rule tabix:
         "tabix -p vcf {input.vcf}"
 
 
+ruleorder: select > bgzip
+
+
 rule select:
     """Select variants of correct type that passed filters"""
     input:
         vcf = "{filename}.vcf.gz"
     output:
-        vcf = "selected/{filename}.vcf"
+        vcf = "selected/{filename}.vcf.gz"
     params: 
         select = '' if svtype == "ALL" else f"-i 'INFO/SVTYPE == \"{svtype}\"'" 
     shell:
-        "bcftools view -f 'PASS,.' {params.select} {input.vcf} > {output.vcf}"
+        "bcftools view -f 'PASS,.' {params.select} {input.vcf} | bgzip -c > {output.vcf}"
 
 
 rule collapse:
