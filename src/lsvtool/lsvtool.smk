@@ -12,30 +12,38 @@ segdups=config.get('segdups')
 
 bench_bed=config.get('bench_bed')
 bench_vcf=config.get('bench_vcf')
+igv_batches=bool(config.get('igv_batches', True))
 
 segdups_dist=20_000  # 20kbp is used by longranger (see https://github.com/10XGenomics/longranger/blob/e2a3143b3956af6290fd4ba08e09f76985293685/mro/_combined_sv_caller.mro#L91)
 
-ids = glob_wildcards("{id,[^/]+}.vcf.gz").id 
+# Get samples from VCF names
+samples = glob_wildcards("{id,[^/]+}.vcf.gz").id  # Gzipped
+samples.extend(glob_wildcards("{id,[^/]+}.vcf").id) # Unzipped
 
-expected_files = ["".join(p) for p in product("01", repeat=len(ids))]
-expected_files.remove("1"*len(ids))  # Called 'common'
-expected_files.remove("0"*len(ids))  # No calls
+expected_files = ["".join(p) for p in product("01", repeat=len(samples))]
+expected_files.remove("1"*len(samples))  # Called 'common'
+expected_files.remove("0"*len(samples))  # No calls
 expected_files.append("common")
 
 final_input = [
-    expand("filtered/{filename}.final.bedpe", filename=ids),
-    expand("filtered/{filename}.final.vcf.gz.tbi", filename=ids),
-    expand("to_igv_plot/{files}.batch", files=expected_files),
+    expand("filtered/{filename}.final.bedpe", filename=samples),
+    expand("filtered/{filename}.final.vcf.gz.tbi", filename=samples),
     "merged/merged.vcf",
     "merged/merged_comp_mat_heatmap.png",
     "merged/merged_comp_mat_jaccard_heatmap.png",
-    "merged/merged_venn.png",
-    "to_igv_plot/README.md"
+    "merged/merged_venn.png",   
 ]
 
-if bench_bed and bench_vcf:
+
+if bench_vcf:
     final_input.extend([
-        expand("bench/{filename}", filename=ids)
+        expand("bench/{filename}.jl", filename=samples)
+    ])
+
+if igv_batches:
+    final_input.extend([
+        expand("to_igv_plot/{files}.batch", files=expected_files),
+        "to_igv_plot/README.md"
     ])
 
 
@@ -168,7 +176,8 @@ rule filter_segdups:
 
 
 rule vcftobedpe:
-    """Comman 'SURVIVOR vcftobed' acctually outputs BEDPE"""
+    """Convert from VCF to BEDPE"""
+    # NB: Comman 'SURVIVOR vcftobed' acctually outputs BEDPE
     input:
         vcf = "{filename}.vcf"
     output:
@@ -184,7 +193,7 @@ rule vcftobedpe:
 rule merge_lsv_files:
     """Merge SV between multiple VCF to find common variants"""
     input: 
-        vcfs = expand("filtered/{filename}.final.vcf", filename=ids)
+        vcfs = expand("filtered/{filename}.final.vcf", filename=samples)
     output: 
         vcf = temp("merged/merged_no_names.vcf"),
         list = "merged/files_merged.list"
@@ -214,7 +223,7 @@ rule reheader:
         list = "merged/sample_names.list"
     run:
         with open(output.list, "w") as f:
-            f.writelines("\n".join(ids) + "\n")
+            f.writelines("\n".join(samples) + "\n")
         shell("bcftools reheader -s {output.list} {input.vcf} > {output.vcf}")
 
 
@@ -284,11 +293,15 @@ rule get_igv_regions:
     output:
         bed = touch("to_igv_plot/{files}.bed")
     run:
-        lable=wildcards.files
-        i = " ".join(list(lable))
-        if lable == "common":
-            i = " ".join(list("1"*len(ids)))
-        shell(f"cut -f 1,2,5,12 {input.bedpe} | grep \'{i} $\' | sed \'s/{i} /{lable}/g\' > {output.bed}")
+        label=wildcards.files
+        i = " ".join(list(label))
+        if label == "common":
+            i = " ".join(list("1"*len(samples)))
+        try:
+            shell(f"cut -f 1,2,5,12 {input.bedpe} | grep \'{i} $\' | sed \'s/{i} /{label}/g\' > {output.bed}")
+        except RuntimeError:
+            # Runtime error raised if `i` is missing from input
+            pass
 
 
 rule output_igv_batches:
@@ -297,7 +310,15 @@ rule output_igv_batches:
     output: 
         batch = "to_igv_plot/{file}.batch"
     shell:
-        "bedtools igv -i {input.bed} -slop 1000 -clps -name | sed \'s/collapse/squish/g\' > {output.batch}"
+        "bedtools igv"
+        " -i {input.bed}"
+        " -slop 1000"
+        " -clps"
+        " -name"
+        " -path {wildcards.file}"
+        " |"
+        " sed \'s/collapse/squish/g\'"
+        " > {output.batch}"
 
 
 rule to_igv_plot_readme:
@@ -315,14 +336,14 @@ BATCH files (`*.batch`) contain scripts to generate images of said regions withi
 
 See table below for which files contain which sets.
 """, file=fout)
-            wcol = max(map(len, ids)) + 2
+            wcol = max(map(len, samples)) + 2
             wname = max(max(map(len, expected_files)) + 1, 7)
             true_str = "X".center(wcol, " ")
             false_str = " "*wcol
-            print("Prefix".ljust(wname, " "), *[i.center(wcol, " ") for i in ids], file=fout)
+            print("Prefix".ljust(wname, " "), *[i.center(wcol, " ") for i in samples], file=fout)
             for file in expected_files:
                 if file == "common":
-                    cols = [true_str] * len(ids)
+                    cols = [true_str] * len(samples)
                 else:
                     cols = [true_str if char == "1" else false_str for char in list(file)]
                 print(file.ljust(wname, " "), *cols, file=fout)
@@ -335,7 +356,8 @@ rule bench:
         dir = directory("bench/{file}")
     log: "bench/{file}.log"
     params:
-        sizefilt = int(minlength * 0.6)
+        sizefilt = int(minlength * 0.7),
+        bed = f"--includebed {bench_bed}" if bench_bed else ""
     shell:
         "truvari bench"
         " --base {bench_vcf}"
@@ -344,11 +366,20 @@ rule bench:
         " --sizefilt {params.sizefilt}"
         " --sizemin {minlength}"
         " --sizemax {maxlength}" 
-        " --includebed {bench_bed}"
-        " --giabreport"
+        " {params.bed}"
         " --refdist 2000"
         " --chunksize 3000"
         " --pctsim 0"
         " --pctsize 0.7"
         " --passonly"
         " 2> {log}"
+
+
+rule vcf2db_bench:
+    input:
+        dir = "bench/{file}"
+    output:
+        joblib = "bench/{file}.jl"
+    log: "bench/{file}.jl.log"
+    shell:
+        "truvari vcf2df -i -b {input.dir} {output.joblib}"

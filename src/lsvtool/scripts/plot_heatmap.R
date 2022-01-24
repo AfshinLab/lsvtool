@@ -41,7 +41,7 @@ for (i in 1:nrow(tt)) {
         if (i == j) {
             tt_norm[i, j] = 1
         } else {
-            #tt_norm[i, j] = round(tt[i, j] / (tt[i, i] + tt[j, j] - (2 * tt[i, j])), 2) # Jaccard index
+            #tt_norm[i, j] = round(tt[i, j] / (tt[i, i] + tt[j, j] - tt[i, j]), 2) # Jaccard index
             tt_norm[i, j] = round(tt[i, j] / min(c(tt[i, i], tt[j, j])), 2) # Modified jaccard index
         }
     }
