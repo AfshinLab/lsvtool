@@ -1,102 +1,85 @@
 """
-Start the analysis
+Run the pipeline.
+
+This is a small wrapper around Snakemake that sets some default parameters.
+
+To run full pipeline use:
+
+    $ lsvtool run
+
+Arguments for snakemake are passed as:
+
+    $ lsvtool run [snakemake_args [snakemake_args ...]]]
+
+For example, to do a dry-run (not executing anything, only showing what would be done) use:
+
+    $ lsvtool run -n
+
+For info about arguments related to Snakemake run '$ snakemake -h' or look at the official
+documentation at https://snakemake.readthedocs.io/en/stable/executing/cli.html.
 """
+
+# Snakemake wrapping parially based on:
+#  - http://ivory.idyll.org/blog/2020-improved-workflows-as-applications.html
+#  - https://github.com/dib-lab/charcoal/blob/latest/charcoal/__main__.py
 
 import logging
 import sys
+import os
+import subprocess
+from typing import List
 import pkg_resources
-from snakemake import snakemake
+
 from snakemake.utils import available_cpu_count
 
 logger = logging.getLogger(__name__)
 
 
-class SnakemakeError(Exception):
-    pass
-
-
 def add_arguments(parser):
-    # Positionals
     parser.add_argument(
-        "targets", nargs="*", metavar="<TARGETS>",
-        help="File(s) to create excluding paths). If omitted, the full pipeline is run."
+        '-c', '--cores', metavar='N', type=int, default=available_cpu_count(),
+        help='Run on at most N CPU cores in parallel. '
+        'Default: %(default)s (all available cores).'
     )
-    # Options
-    parser.add_argument(
-        "-n", "--dryrun", default=False, action="store_true",
-        help="Perform dry run of pipeline. DEFAULT: False."
-    )
-    parser.add_argument(
-        "--dag", default=False, action="store_true",
-        help="Print the dag in the graphviz dot language. DEFAULT: False. To det "
-             "output to pdf file, pipe output into dot as follows: '$ dbsrep run --dag "
-             "| dot -Tpdf > dag.pdf'"
-    )
-    parser.add_argument(
-        "-c", "--cores", metavar="<int>", type=int,
-        default=available_cpu_count(),
-        help="Maximum number of cores to run in parallel. DEFAULT: Use as many as "
-             "available."
-    )
-    parser.add_argument(
-        '--keepgoing', '-k', default=False, action='store_true',
-        help='If one job fails, finish the others.')
-    parser.add_argument(
-        '--unlock', default=False, action='store_true',
-        help='Remove a lock on the working directory.'
-    )
-    parser.add_argument(
-        "--dir",
-        help="Path to analysis directory. DEFAULT: CWD"
+
+    # This argument will not capture any arguments due to nargs=-1. Instead parse_known_args()
+    # is used in __main__.py to add any arguments not captured here to snakemake_args.
+    smk_args = parser.add_argument_group("snakemake arguments")
+    smk_args.add_argument(
+        'snakemake_args', nargs=-1,
+        help="Arguments passed to snakemake. For info about snakemake options run "
+             "'snakemake --help'."
     )
 
 
 def main(args):
-    targets = args.targets if args.targets else None
     try:
-        run(args.dryrun, args.cores, args.keepgoing, args.unlock, args.dag, targets)
-    except SnakemakeError:
-        sys.exit(1)
+        run(cores=args.cores,
+            snakemake_args=args.snakemake_args)
+    except subprocess.CalledProcessError as e:
+        print(f'Error in snakemake invocation: {e}', file=sys.stderr)
+        sys.exit(e.returncode)
     sys.exit(0)
 
 
 def run(
-        dryrun: bool = False,
-        cores: int = 4,
-        keepgoing: bool = False,
-        unlock: bool = False,
-        printdag: bool = False,
-        targets=None,
-        workdir=None,
-):
-    # snakemake sets up its own logging, and this cannot be easily changed
-    # (setting keep_logger=True crashes), so remove our own log handler
-    # for now
-    logger.root.handlers = []
+    cores: int = 4,
+    snakefile: str = "lsvtool.smk",
+    workdir=None,
+    snakemake_args: List[str] = None,
+):   
     snakefile_path = pkg_resources.resource_filename("lsvtool", "lsvtool.smk")
-    success = snakemake(snakefile_path,
-                        snakemakepath="snakemake",  # Needed in snakemake 3.9.0
-                        dryrun=dryrun,
-                        printdag=printdag,
-                        quiet=False if not printdag else True,
-                        cores=cores,
-                        keepgoing=keepgoing,
-                        unlock=unlock,
-                        printshellcmds=True,
-                        targets=targets,
-                        log_handler=[print_log_on_error],
-                        workdir=workdir)
-    if not success:
-        raise SnakemakeError()
 
+    cmd = ["snakemake", "-s", str(snakefile_path), "--cores", str(cores)]
 
-def print_log_on_error(msg):
-    """Prints logs of failed rules in case of error"""
-    if msg["level"] == "job_error" and msg["log"]:
-        for log in msg["log"]:
-            head = f"=== Output from log: '{log}' ==="
-            print(head)
-            if log.exists:
-                with open(log) as f:
-                    print(f.read().strip())
-            print("-"*len(head))
+    # Set defaults
+    cmd += ["--printshellcmds"]
+
+    if workdir is not None:
+        cmd += ["--directory", str(workdir)]
+
+    if snakemake_args is not None:
+        cmd += snakemake_args
+
+    logger.debug(f"Command: {' '.join(cmd)}")
+    subprocess.check_call(cmd)

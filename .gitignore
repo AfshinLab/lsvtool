@@ -174,3 +174,6 @@ vignettes/*.pdf
 # VisualStudio Code
 ##
 .vscode/
+
+
+.DS_Store
