@@ -62,7 +62,7 @@ rule get_blacklist:
         else:
             files = BL.split(",")
             if len(files) == 1:
-                shell("ln -s {files[0]} {output.bed}")
+                shell("ln -s $PWD/{files[0]} $PWD/{output.bed}")
             else: # Concat multiple
                 file_str = " ".join(files)
                 shell("cat {file_str} > {output.bed}")
@@ -172,7 +172,7 @@ rule filter_segdups:
                 " 2> {log}"
             )
         else:
-            shell("ln -s {input.vcf} {output.vcf}")
+            shell("ln -s $PWD/{input.vcf} $PWD/{output.vcf}")
 
 
 rule vcftobedpe:
