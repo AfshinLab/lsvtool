@@ -111,7 +111,8 @@ rule collapse:
         removed = "collapsed/{filename}.removed.vcf"
     log: "collapsed/{filename}.vcf.log"
     params:
-        sizemin = int(minlength * 0.8)
+        sizemin = int(minlength * 0.8),
+        sizemax = int(maxlength / 0.8)
     run:
         command = (
             "truvari collapse"
@@ -125,7 +126,7 @@ rule collapse:
             " --passonly"
             " --refdist {dist}"
             " --sizemin {params.sizemin}"
-            " --sizemax {maxlength}"
+            " --sizemax {params.sizemax}"
             " 2> {log}"
             " |"
             " bcftools sort -"
