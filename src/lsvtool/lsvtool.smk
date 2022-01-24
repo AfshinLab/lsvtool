@@ -74,7 +74,7 @@ rule bgzip:
     output:
         vcf = "{file}.vcf.gz"
     shell:
-        "bgzip -c {input.vcf} > {output.vcf}"
+        "bcftools sort {input.vcf} | bgzip -c > {output.vcf}"
 
 
 rule tabix:
