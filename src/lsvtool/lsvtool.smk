@@ -109,7 +109,6 @@ rule collapse:
             " --pctsim 0"
             " --pctovl 0.8"
             " --pctsize 0.8"
-            " --passonly"
             " --refdist {dist}"
             " --sizemin {params.sizemin}"
             " --sizemax {params.sizemax}"
@@ -273,14 +272,14 @@ rule intersect_bedpe:
         bedpe = "merged/merged.bedpe",
         intersection = "merged/merged_intersection.txt",
     output: 
-        joint_bedpe = "merged/merge_intersection.bedpe",
+        joint_bedpe = "merged/merged_intersection.bedpe",
     shell:
         "paste {input.bedpe} {input.intersection} > {output.joint_bedpe}"
 
 
 rule get_igv_regions:
     input:
-        bedpe = "merged/merge_intersection.bedpe",
+        bedpe = "merged/merged_intersection.bedpe",
     output:
         bed = touch("to_igv_plot/{files}.bed")
     run:
@@ -290,7 +289,7 @@ rule get_igv_regions:
             i = " ".join(list("1"*len(samples)))
         try:
             shell(f"cut -f 1,2,5,12 {input.bedpe} | grep \'{i} $\' | sed \'s/{i} /{label}/g\' > {output.bed}")
-        except RuntimeError:
+        except Exception:
             # Runtime error raised if `i` is missing from input
             pass
 
@@ -373,4 +372,4 @@ rule vcf2db_bench:
         joblib = "bench/{file}.jl"
     log: "bench/{file}.jl.log"
     shell:
-        "truvari vcf2df -i -b {input.dir} {output.joblib}"
+        "truvari vcf2df -i -b {input.dir} {output.joblib} 2> {log}"
