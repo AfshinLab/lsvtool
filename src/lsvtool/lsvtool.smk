@@ -24,11 +24,6 @@ segdups_dist = 20_000  # 20kbp is used by longranger (see https://github.com/10X
 samples = glob_wildcards("{id,[^/]+}.vcf.gz").id  # Gzipped
 samples.extend(glob_wildcards("{id,[^/]+}.vcf").id) # Unzipped
 
-expected_files = ["".join(p) for p in product("01", repeat=len(samples))]
-expected_files.remove("1"*len(samples))  # Called 'common'
-expected_files.remove("0"*len(samples))  # No calls
-expected_files.append("common")
-
 final_input = [
     expand("filtered/{filename}.final.bedpe", filename=samples),
     expand("filtered/{filename}.final.vcf.gz.tbi", filename=samples),
@@ -45,6 +40,11 @@ if bench_vcf:
     ])
 
 if igv_batches:
+    expected_files = ["".join(p) for p in product("01", repeat=len(samples))]
+    expected_files.remove("1"*len(samples))  # Called 'common'
+    expected_files.remove("0"*len(samples))  # No calls
+    expected_files.append("common")
+
     final_input.extend([
         expand("to_igv_plot/{files}.batch", files=expected_files),
         "to_igv_plot/README.md"
