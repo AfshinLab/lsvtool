@@ -1,7 +1,7 @@
 import sys
 import numpy as np
 from collections import Counter
-
+from pathlib import Path
 
 class Summary(Counter):
 
@@ -43,4 +43,4 @@ def check_path(path_str):
     
     if not path.is_absolute():
         return path.resolve()
-    return path()
+    return path
