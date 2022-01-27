@@ -3,10 +3,12 @@ from itertools import product
 
 configfile: "parameters.config"
 
+
 svtype=config.get("svtype", "ALL")
-dist=config.get("dist", 1000)
-minlength=config.get("minlength", 0)
-maxlength=config.get("maxlength", 1_000_000)
+dist=int(config.get("dist", 1000))
+dist_merge=float(config.get("dist_merge", 1000))
+minlength=int(config.get("minlength", 50))
+maxlength=int(config.get("maxlength", 1_000_000_000))
 BL=config.get('BL')
 segdups=config.get('segdups')
 
@@ -208,7 +210,7 @@ rule merge_lsv_files:
 
         shell("SURVIVOR merge"
               " {output.list}"
-              " {dist}"
+              " {dist_merge}"
               " 1"
               " 0"
               " 0"
