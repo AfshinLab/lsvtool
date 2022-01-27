@@ -341,7 +341,8 @@ See table below for which files contain which sets.
 
 rule bench:
     input:
-        vcf = "filtered/{file}.final.vcf.gz"
+        vcf = "filtered/{file}.final.vcf.gz",
+        index = "filtered/{file}.final.vcf.gz.tbi"
     output:
         dir = directory("bench/{file}")
     log: "bench/{file}.log"
