@@ -7,8 +7,11 @@ configfile: "parameters.config"
 
 
 svtype = config.get("svtype", "ALL")
-dist = int(config.get("dist", 1000))
 dist_merge = float(config.get("dist_merge", 1000))
+
+# 20kbp is used by longranger (see https://github.com/10XGenomics/longranger/blob/e2a3143b3956af6290fd4ba08e09f76985293685/mro/_combined_sv_caller.mro#L91)
+segdups_dist = int(config.get("dist_segdups", 20_000))  
+
 minlength = int(config.get("minlength", 50))
 maxlength = int(config.get("maxlength", 1_000_000_000))
 BL = check_path(config.get('BL'))
@@ -18,7 +21,9 @@ bench_bed = check_path(config.get('bench_bed'))
 bench_vcf = check_path(config.get('bench_vcf'))
 igv_batches = bool(config.get('igv_batches', True))
 
-segdups_dist = 20_000  # 20kbp is used by longranger (see https://github.com/10XGenomics/longranger/blob/e2a3143b3956af6290fd4ba08e09f76985293685/mro/_combined_sv_caller.mro#L91)
+filters = config.get("filters", None)
+collapse_args = config.get("collapse_args", "")
+bench_args = config.get("bench_args", "")
 
 # Get samples from VCF names
 samples = glob_wildcards("{id,[^/]+}.vcf.gz").id  # Gzipped
@@ -85,8 +90,9 @@ rule select:
         vcf = "selected/{filename}.vcf.gz"
     params: 
         select = '' if svtype == "ALL" else f"-i 'INFO/SVTYPE == \"{svtype}\"'" 
+        filters = '' if filters is None else f"-f {filters}"
     shell:
-        "bcftools view -f 'PASS,.' {params.select} {input.vcf} | bgzip -c > {output.vcf}"
+        "bcftools view {params.filters} {params.select} {input.vcf} | bgzip -c > {output.vcf}"
 
 
 rule collapse:
@@ -107,11 +113,7 @@ rule collapse:
             " --input {input.vcf}"
             " --collapsed-output {output.removed}"
             " --keep *"
-            " --chain"
-            " --pctsim 0"
-            " --pctovl 0.8"
-            " --pctsize 0.8"
-            " --refdist {dist}"
+            " {collapse_args}"
             " --sizemin {params.sizemin}"
             " --sizemax {params.sizemax}"
             " 2> {log}"
@@ -360,11 +362,7 @@ rule bench:
         " --sizemin {minlength}"
         " --sizemax {maxlength}" 
         " {params.bed}"
-        " --refdist 2000"
-        " --chunksize 3000"
-        " --pctsim 0"
-        " --pctsize 0.7"
-        " --passonly"
+        " {bench_args}"
         " 2> {log}"
 
 
