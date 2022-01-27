@@ -54,22 +54,6 @@ rule final:
         final_input
 
 
-rule get_blacklist:
-    """Setup blacklist, merge multple if provided"""
-    output:
-        bed = "blacklist.bed"
-    run:
-        if not BL:
-            shell("touch {output.bed}")
-        else:
-            files = BL.split(",")
-            if len(files) == 1:
-                shell("ln -s $PWD/{files[0]} $PWD/{output.bed}")
-            else: # Concat multiple
-                file_str = " ".join(files)
-                shell("cat {file_str} > {output.bed}")
-
-
 rule bgzip:
     input:
         vcf = "{file}.vcf"
@@ -143,15 +127,16 @@ rule collapse:
 rule filter_blacklist:
     """Filter SVs against blacklist and for size"""
     input:
-        vcf = "collapsed/{filename}.vcf",
-        blacklist = "blacklist.bed"
+        vcf = "collapsed/{filename}.vcf"
     output:
         vcf = "filtered/{filename}.vcf"
     log: "filtered/{filename}.vcf.log"
+    params:
+        blacklist = BL if BL else "NA"
     shell:
         "SURVIVOR filter"
         " {input.vcf}"
-        " {input.blacklist}"
+        " {params.blacklist}"
         " {minlength}"
         " {maxlength}"
         " -1"
