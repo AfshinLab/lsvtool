@@ -31,3 +31,16 @@ class Summary(Counter):
 
             print(f"{name:<{max_name_width}} {value_str}", file=print_to)
         print("="*width, file=print_to)
+
+
+def check_path(path_str):
+    if path_str == "" or path_str is None:
+        return None
+
+    path = Path(path_str)
+    if not path.exists():
+        raise FileNotFoundError(f"Path {path_str} does not exist!")
+    
+    if not path.is_absolute():
+        return path.resolve()
+    return path()

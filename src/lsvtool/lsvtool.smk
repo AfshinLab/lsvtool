@@ -1,22 +1,24 @@
 import glob
 from itertools import product
 
+from lsvtool.utils import check_path
+
 configfile: "parameters.config"
 
 
-svtype=config.get("svtype", "ALL")
-dist=int(config.get("dist", 1000))
-dist_merge=float(config.get("dist_merge", 1000))
-minlength=int(config.get("minlength", 50))
-maxlength=int(config.get("maxlength", 1_000_000_000))
-BL=config.get('BL')
-segdups=config.get('segdups')
+svtype = config.get("svtype", "ALL")
+dist = int(config.get("dist", 1000))
+dist_merge = float(config.get("dist_merge", 1000))
+minlength = int(config.get("minlength", 50))
+maxlength = int(config.get("maxlength", 1_000_000_000))
+BL = check_path(config.get('BL'))
+segdups = check_path(config.get('segdups'))
 
-bench_bed=config.get('bench_bed')
-bench_vcf=config.get('bench_vcf')
-igv_batches=bool(config.get('igv_batches', True))
+bench_bed = check_path(config.get('bench_bed'))
+bench_vcf = check_path(config.get('bench_vcf'))
+igv_batches = bool(config.get('igv_batches', True))
 
-segdups_dist=20_000  # 20kbp is used by longranger (see https://github.com/10XGenomics/longranger/blob/e2a3143b3956af6290fd4ba08e09f76985293685/mro/_combined_sv_caller.mro#L91)
+segdups_dist = 20_000  # 20kbp is used by longranger (see https://github.com/10XGenomics/longranger/blob/e2a3143b3956af6290fd4ba08e09f76985293685/mro/_combined_sv_caller.mro#L91)
 
 # Get samples from VCF names
 samples = glob_wildcards("{id,[^/]+}.vcf.gz").id  # Gzipped
@@ -131,7 +133,7 @@ rule filter_blacklist:
         vcf = "filtered/{filename}.vcf"
     log: "filtered/{filename}.vcf.log"
     params:
-        blacklist = BL if BL else "NA"
+        blacklist = BL if BL is not None else "NA"
     shell:
         "SURVIVOR filter"
         " {input.vcf}"
@@ -348,7 +350,7 @@ rule bench:
     log: "bench/{file}.log"
     params:
         sizefilt = int(minlength * 0.7),
-        bed = f"--includebed {bench_bed}" if bench_bed else ""
+        bed = f"--includebed {bench_bed}" if bench_bed is not None else ""
     shell:
         "truvari bench"
         " --base {bench_vcf}"
