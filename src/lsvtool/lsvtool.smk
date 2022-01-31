@@ -28,11 +28,13 @@ bench_args = config.get("bench_args", "")
 # Get samples from VCF names
 samples = glob_wildcards("{id,[^/]+}.vcf.gz").id  # Gzipped
 samples.extend(glob_wildcards("{id,[^/]+}.vcf").id) # Unzipped
+samples.sort()
 
 final_input = [
     expand("filtered/{filename}.final.bedpe", filename=samples),
     expand("filtered/{filename}.final.vcf.gz.tbi", filename=samples),
     "merged/merged.vcf",
+    "merged/merged.jl",
     "merged/merged_comp_mat_heatmap.png",
     "merged/merged_comp_mat_jaccard_heatmap.png",
     "merged/merged_venn.png",   
@@ -184,7 +186,7 @@ rule vcftobedpe:
         " {output.bedpe}"
 
 
-rule merge_lsv_files:
+rule merge_svs:
     """Merge SV between multiple VCF to find common variants"""
     input: 
         vcfs = expand("filtered/{filename}.final.vcf", filename=samples)
@@ -374,3 +376,23 @@ rule vcf2db_bench:
     log: "bench/{file}.jl.log"
     shell:
         "truvari vcf2df -i -b {input.dir} {output.joblib} 2> {log}"
+
+
+rule vcf2df_merge:
+    input:
+        vcf = "merged/merged.vcf"
+    output:
+        jl = "merged/merged.jl"
+    log: "merged/merged.jl.log"
+    params:
+        samples_str = ",".join(samples)
+    shell:
+        "truvari vcf2df"
+        " -i"
+        " -m"
+        " -f"
+        " -s {params.samples_str}"
+        " -S"
+        " {input.vcf}"
+        " {output.jl}"
+        " 2> {log}"
