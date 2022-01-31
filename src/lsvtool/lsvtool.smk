@@ -89,7 +89,7 @@ rule select:
     output:
         vcf = "selected/{filename}.vcf.gz"
     params: 
-        select = '' if svtype == "ALL" else f"-i 'INFO/SVTYPE == \"{svtype}\"'" 
+        select = '' if svtype == "ALL" else f"-i 'INFO/SVTYPE == \"{svtype}\"'",
         filters = '' if filters is None else f"-f {filters}"
     shell:
         "bcftools view {params.filters} {params.select} {input.vcf} | bgzip -c > {output.vcf}"
