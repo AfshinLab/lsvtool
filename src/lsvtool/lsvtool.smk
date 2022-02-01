@@ -31,13 +31,13 @@ samples.extend(glob_wildcards("{id,[^/]+}.vcf").id) # Unzipped
 samples.sort()
 
 final_input = [
-    expand("filtered/{filename}.final.bedpe", filename=samples),
-    expand("filtered/{filename}.final.vcf.gz.tbi", filename=samples),
-    "merged/merged.vcf",
-    "merged/merged.jl",
-    "merged/merged_comp_mat_heatmap.png",
-    "merged/merged_comp_mat_jaccard_heatmap.png",
-    "merged/merged_venn.png",   
+    expand("3_filtered/{filename}.final.bedpe", filename=samples),
+    expand("3_filtered/{filename}.final.vcf.gz.tbi", filename=samples),
+    "4_merged/merged.vcf",
+    "4_merged/merged.jl",
+    "4_merged/merged_comp_mat_heatmap.png",
+    "4_merged/merged_comp_mat_jaccard_heatmap.png",
+    "4_merged/merged_venn.png",   
 ]
 
 
@@ -53,8 +53,8 @@ if igv_batches:
     expected_files.append("common")
 
     final_input.extend([
-        expand("to_igv_plot/{files}.batch", files=expected_files),
-        "to_igv_plot/README.md"
+        expand("5_to_igv_plot/{files}.batch", files=expected_files),
+        "5_to_igv_plot/README.md"
     ])
 
 
@@ -89,7 +89,7 @@ rule select:
     input:
         vcf = "{filename}.vcf.gz"
     output:
-        vcf = "selected/{filename}.vcf.gz"
+        vcf = "1_selected/{filename}.vcf.gz"
     params: 
         select = '' if svtype == "ALL" else f"-i 'INFO/SVTYPE == \"{svtype}\"'",
         filters = '' if filters is None else f"-f {filters}"
@@ -100,12 +100,12 @@ rule select:
 rule collapse:
     """Collapse variants of similar size and breakpoints"""
     input:
-        vcf = "selected/{filename}.vcf.gz",
-        index = "selected/{filename}.vcf.gz.tbi",
+        vcf = "1_selected/{filename}.vcf.gz",
+        index = "1_selected/{filename}.vcf.gz.tbi",
     output:
-        vcf = "collapsed/{filename}.vcf",
-        removed = "collapsed/{filename}.removed.vcf"
-    log: "collapsed/{filename}.vcf.log"
+        vcf = "2_collapsed/{filename}.vcf",
+        removed = "2_collapsed/{filename}.removed.vcf"
+    log: "2_collapsed/{filename}.vcf.log"
     params:
         sizemin = int(minlength * 0.8),
         sizemax = int(maxlength / 0.8)
@@ -132,10 +132,10 @@ rule collapse:
 rule filter_blacklist:
     """Filter SVs against blacklist and for size"""
     input:
-        vcf = "collapsed/{filename}.vcf"
+        vcf = "2_collapsed/{filename}.vcf"
     output:
-        vcf = "filtered/{filename}.vcf"
-    log: "filtered/{filename}.vcf.log"
+        vcf = "3_filtered/{filename}.vcf"
+    log: "3_filtered/{filename}.vcf.log"
     params:
         blacklist = BL if BL is not None else "NA"
     shell:
@@ -153,10 +153,10 @@ rule filter_blacklist:
 rule filter_segdups:
     """Filter SVs for overlap with segmental duplications if provided"""
     input:
-        vcf = "filtered/{filename}.vcf"
+        vcf = "3_filtered/{filename}.vcf"
     output:
-        vcf = "filtered/{filename}.final.vcf"
-    log: "filtered/{filename}.final.vcf.log"
+        vcf = "3_filtered/{filename}.final.vcf"
+    log: "3_filtered/{filename}.final.vcf.log"
     run:
         if segdups:
             shell(
@@ -189,11 +189,11 @@ rule vcftobedpe:
 rule merge_svs:
     """Merge SV between multiple VCF to find common variants"""
     input: 
-        vcfs = expand("filtered/{filename}.final.vcf", filename=samples)
+        vcfs = expand("3_filtered/{filename}.final.vcf", filename=samples)
     output: 
-        vcf = temp("merged/merged_no_names.vcf"),
-        list = "merged/files_merged.list"
-    log: "merged/merged_no_names.vcf.log"
+        vcf = temp("4_merged/merged_no_names.vcf"),
+        list = "4_merged/files_merged.list"
+    log: "4_merged/merged_no_names.vcf.log"
     run:
         with open(output.list, "w") as f:
             f.writelines("\n".join(input.vcfs) + "\n")
@@ -213,10 +213,10 @@ rule merge_svs:
 rule reheader:
     """Add correct sample names to files"""
     input:
-        vcf = "merged/merged_no_names.vcf"
+        vcf = "4_merged/merged_no_names.vcf"
     output:
-        vcf = "merged/merged.vcf",
-        list = "merged/sample_names.list"
+        vcf = "4_merged/merged.vcf",
+        list = "4_merged/sample_names.list"
     run:
         with open(output.list, "w") as f:
             f.writelines("\n".join(samples) + "\n")
@@ -226,9 +226,9 @@ rule reheader:
 rule gencomp:
     """Compare SVs between sample and output comparison matrix"""
     input:
-        vcf = "merged/merged.vcf"
+        vcf = "4_merged/merged.vcf"
     output:
-        txt = "merged/merged_comp_mat.txt"
+        txt = "4_merged/merged_comp_mat.txt"
     shell:
         "SURVIVOR genComp {input.vcf} 0 {output.txt}"
 
@@ -236,11 +236,11 @@ rule gencomp:
 rule plot_heatmap:
     """Plot matrix as heatmap"""
     input:
-        "merged/merged_comp_mat.txt",
-        "merged/sample_names.list"
+        "4_merged/merged_comp_mat.txt",
+        "4_merged/sample_names.list"
     output:
-        "merged/merged_comp_mat_heatmap.png",
-        "merged/merged_comp_mat_jaccard_heatmap.png",
+        "4_merged/merged_comp_mat_heatmap.png",
+        "4_merged/merged_comp_mat_jaccard_heatmap.png",
     script:
         "scripts/plot_heatmap.R"
 
@@ -249,9 +249,9 @@ rule intersection:
     """For each SV list the samples it appears for"""
     # Code from https://github.com/fritzsedlazeck/SURVIVOR/wiki#plotting-the-comparison-of-multiple-input-vcf-files-after-merging
     input:
-        "merged/merged.vcf"
+        "4_merged/merged.vcf"
     output:
-        "merged/merged_intersection.txt"
+        "4_merged/merged_intersection.txt"
     shell:
         "perl -ne \'print \"$1\\n\" if /SUPP_VEC=([^,;]+)/\' {input} | sed -e \'s/\\(.\\)/\\1 /g\' > {output}"
 
@@ -259,10 +259,10 @@ rule intersection:
 rule plot_venn:
     """Plot venn-diagram of SVs"""
     input:
-        "merged/merged_intersection.txt",
-        "merged/sample_names.list"
+        "4_merged/merged_intersection.txt",
+        "4_merged/sample_names.list"
     output:
-        "merged/merged_venn.png",
+        "4_merged/merged_venn.png",
     params:
         svtype = svtype
     script:
@@ -275,19 +275,19 @@ ruleorder: intersect_bedpe > vcftobedpe
 rule intersect_bedpe:
     # Attach intersection info to BEDPE
     input: 
-        bedpe = "merged/merged.bedpe",
-        intersection = "merged/merged_intersection.txt",
+        bedpe = "4_merged/merged.bedpe",
+        intersection = "4_merged/merged_intersection.txt",
     output: 
-        joint_bedpe = "merged/merged_intersection.bedpe",
+        joint_bedpe = "4_merged/merged_intersection.bedpe",
     shell:
         "paste {input.bedpe} {input.intersection} > {output.joint_bedpe}"
 
 
 rule get_igv_regions:
     input:
-        bedpe = "merged/merged_intersection.bedpe",
+        bedpe = "4_merged/merged_intersection.bedpe",
     output:
-        bed = touch("to_igv_plot/{files}.bed")
+        bed = touch("5_to_igv_plot/{files}.bed")
     run:
         label=wildcards.files
         i = " ".join(list(label))
@@ -302,9 +302,9 @@ rule get_igv_regions:
 
 rule output_igv_batches:
     input: 
-        bed = "to_igv_plot/{file}.bed"
+        bed = "5_to_igv_plot/{file}.bed"
     output: 
-        batch = "to_igv_plot/{file}.batch"
+        batch = "5_to_igv_plot/{file}.batch"
     shell:
         "bedtools igv"
         " -i {input.bed}"
@@ -319,7 +319,7 @@ rule output_igv_batches:
 
 rule to_igv_plot_readme:
     output:
-        "to_igv_plot/README.md"
+        "5_to_igv_plot/README.md"
     run:
         with open(output[0], "w") as fout:
             print("""
@@ -347,8 +347,8 @@ See table below for which files contain which sets.
 
 rule bench:
     input:
-        vcf = "filtered/{file}.final.vcf.gz",
-        index = "filtered/{file}.final.vcf.gz.tbi"
+        vcf = "3_filtered/{file}.final.vcf.gz",
+        index = "3_filtered/{file}.final.vcf.gz.tbi"
     output:
         dir = directory("bench/{file}")
     log: "bench/{file}.log"
@@ -380,10 +380,10 @@ rule vcf2db_bench:
 
 rule vcf2df_merge:
     input:
-        vcf = "merged/merged.vcf"
+        vcf = "4_merged/merged.vcf"
     output:
-        jl = "merged/merged.jl"
-    log: "merged/merged.jl.log"
+        jl = "4_merged/merged.jl"
+    log: "4_merged/merged.jl.log"
     params:
         samples_str = ",".join(samples)
     shell:
