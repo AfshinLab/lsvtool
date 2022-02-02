@@ -26,9 +26,9 @@ collapse_args = config.get("collapse_args", "")
 bench_args = config.get("bench_args", "")
 
 # Get samples from VCF names
-samples = glob_wildcards("{id,[^/]+}.vcf.gz").id  # Gzipped
-samples.extend(glob_wildcards("{id,[^/]+}.vcf").id) # Unzipped
-samples.sort()
+samples = set(glob_wildcards("{id,[^/]+}.vcf.gz").id)  # Gzipped
+samples |= set(glob_wildcards("{id,[^/]+}.vcf").id) # Unzipped
+samples = list(sorted(samples))
 
 final_input = [
     expand("3_filtered/{filename}.final.bedpe", filename=samples),
