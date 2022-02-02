@@ -89,7 +89,7 @@ def run_intersect(
         start = record.start
         try:
             end = record.INFO["END"]
-            assert start < end
+            assert start < end, f"Start {start} > end {end} in record {record}"
         except KeyError:
             logger.info(f"Record missing END: {record}")
             end = -1
