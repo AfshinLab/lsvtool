@@ -30,14 +30,16 @@ samples = set(glob_wildcards("{id,[^/]+}.vcf.gz").id)  # Gzipped
 samples |= set(glob_wildcards("{id,[^/]+}.vcf").id) # Unzipped
 samples = list(sorted(samples))
 
+fig_formats = ["png", "svg"]
+
 final_input = [
     expand("3_filtered/{filename}.final.bedpe", filename=samples),
     expand("3_filtered/{filename}.final.vcf.gz.tbi", filename=samples),
     "4_merged/merged.vcf",
     "4_merged/merged.jl",
-    "4_merged/merged_comp_mat_heatmap.png",
-    "4_merged/merged_comp_mat_jaccard_heatmap.png",
-    "4_merged/merged_venn.png",   
+    expand("4_merged/merged_comp_mat_heatmap.{ext}", ext=fig_formats),
+    expand("4_merged/merged_comp_mat_jaccard_heatmap.{ext}", ext=fig_formats),
+    expand("4_merged/merged_venn.{ext}", ext=fig_formats),   
 ]
 
 
@@ -92,7 +94,7 @@ rule select:
         vcf = "1_selected/{filename}.vcf.gz"
     params: 
         select = '' if svtype == "ALL" else f"-i 'INFO/SVTYPE == \"{svtype}\"'",
-        filters = '' if filters is None else f"-f {filters}"
+        filters = '' if filters is None else f"-f '{filters}'"
     shell:
         "bcftools view {params.filters} {params.select} {input.vcf} | bgzip -c > {output.vcf}"
 
@@ -239,8 +241,8 @@ rule plot_heatmap:
         "4_merged/merged_comp_mat.txt",
         "4_merged/sample_names.list"
     output:
-        "4_merged/merged_comp_mat_heatmap.png",
-        "4_merged/merged_comp_mat_jaccard_heatmap.png",
+        "4_merged/merged_comp_mat_heatmap.{ext}",
+        "4_merged/merged_comp_mat_jaccard_heatmap.{ext}",
     script:
         "scripts/plot_heatmap.R"
 
@@ -262,7 +264,7 @@ rule plot_venn:
         "4_merged/merged_intersection.txt",
         "4_merged/sample_names.list"
     output:
-        "4_merged/merged_venn.png",
+        "4_merged/merged_venn.{ext}",
     params:
         svtype = svtype
     script:
