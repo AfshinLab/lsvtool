@@ -265,6 +265,8 @@ rule plot_venn:
         "4_merged/sample_names.list"
     output:
         "4_merged/merged_venn.{ext}",
+    log:
+        "4_merged/merged_venn.{ext}.log"
     params:
         svtype = svtype
     script:

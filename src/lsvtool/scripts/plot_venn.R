@@ -4,6 +4,9 @@ intersection_file <- snakemake@input[[1]]
 names_file <- snakemake@input[[2]]
 svtype <- snakemake@params$svtype
 output_file <- snakemake@output[[1]]
+log_file <- snakemake@log[[1]]
+
+sink(file=log_file)
 
 samples <- read.table(names_file, header=FALSE)
 number_of_samples = nrow(samples)
@@ -31,6 +34,7 @@ myfill <- myfill[1:number_of_samples]
 venn.diagram(list_to_plot, output=True,
             #image  
             filename =  output_file,
+            disable.logging = TRUE,
             main = gsub(",", " & ", svtype),
             #print.mode = "percent",
             main.cex = .7,
