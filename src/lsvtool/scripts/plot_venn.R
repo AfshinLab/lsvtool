@@ -28,8 +28,8 @@ for (len in 1:number_of_samples) {
 
 names(list_to_plot) <- samples$V1[1:number_of_samples]
 
-
-myfill <- c("pink", "orange" ,"green","blue","red")
+# Form https://davidmathlogic.com/colorblind/#%23648FFF-%23785EF0-%23DC267F-%23FE6100-%23FFB000
+myfill <- c("#E69F00", "#56B4E9" ,"#009E73","#F0E442","#0072B2")
 myfill <- myfill[1:number_of_samples]
 venn.diagram(list_to_plot, output=True,
             #image  
@@ -38,6 +38,7 @@ venn.diagram(list_to_plot, output=True,
             main = gsub(",", " & ", svtype),
             #print.mode = "percent",
             main.cex = .7,
+            cat.fontface = "bold",
             height = 1000 , 
             width = 1000 , 
             resolution = 300,
@@ -45,10 +46,10 @@ venn.diagram(list_to_plot, output=True,
             imagetype = "png",
             #cyrcles
             fill = myfill ,
-            alpha = rep(0.5,number_of_samples),
-            cex = .5, #size numbers
-            #lty = 4, #dotted line
-            lwd = .5, #thickness
+            #alpha = rep(0.5,number_of_samples),
+            cex = .7, #size numbers
+            lty = 'blank', #dotted line
+            lwd = 2, #thickness
             #Set names
             cat.cex = 0.7,
             cat.default.pos = "outer", #or text
