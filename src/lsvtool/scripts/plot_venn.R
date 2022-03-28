@@ -1,4 +1,6 @@
 library("VennDiagram")
+library("tools")
+library("ggplot2")
 
 intersection_file <- snakemake@input[[1]]
 names_file <- snakemake@input[[2]]
@@ -7,6 +9,8 @@ output_file <- snakemake@output[[1]]
 log_file <- snakemake@log[[1]]
 
 sink(file=log_file)
+
+ext = file_ext(output_file)
 
 samples <- read.table(names_file, header=FALSE)
 number_of_samples = nrow(samples)
@@ -31,27 +35,27 @@ names(list_to_plot) <- samples$V1[1:number_of_samples]
 # Form https://davidmathlogic.com/colorblind/#%23648FFF-%23785EF0-%23DC267F-%23FE6100-%23FFB000
 myfill <- c("#E69F00", "#56B4E9" ,"#009E73","#F0E442","#0072B2")
 myfill <- myfill[1:number_of_samples]
-venn.diagram(list_to_plot, output=True,
-            #image  
-            filename =  output_file,
-            disable.logging = TRUE,
-            main = gsub(",", " & ", svtype),
-            #print.mode = "percent",
-            main.cex = .7,
-            cat.fontface = "bold",
-            height = 1000 , 
-            width = 1000 , 
-            resolution = 300,
-            compression = "lzw",
-            imagetype = "png",
-            #cyrcles
-            fill = myfill ,
-            #alpha = rep(0.5,number_of_samples),
-            cex = .7, #size numbers
-            lty = 'blank', #dotted line
-            lwd = 2, #thickness
-            #Set names
-            cat.cex = 0.7,
-            cat.default.pos = "outer", #or text
-            cat.dist = 0.07
-            );
+p <- venn.diagram(
+  list_to_plot, 
+  filename = NULL,
+  disable.logging = TRUE,
+  main = gsub(",", " & ", svtype),
+  print.mode = c("raw", "percent"),
+  sigdigs = 2,
+  main.cex = 1.2,
+  cat.fontface = "bold",
+  height = 3000 , 
+  width = 3000 , 
+  units = "px",
+  resolution = 100,
+  compression = "lzw",
+  imagetype = ext,
+  fill = myfill ,
+  cex = 1, #size numbers
+  lty = 'blank', #dotted line
+  #Set names
+  cat.cex = 1.1,
+  cat.default.pos = "outer",
+  );
+
+ggsave(p, file=output_file, device=ext, units="px")
