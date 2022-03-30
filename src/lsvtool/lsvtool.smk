@@ -242,7 +242,7 @@ rule plot_heatmap:
         "4_merged/sample_names.list"
     output:
         "4_merged/merged_comp_mat_heatmap.{ext}",
-        "4_merged/merged_comp_mat_jaccard_heatmap.{ext}",
+        "4_merged/merged_comp_mat_overlap_heatmap.{ext}",
     script:
         "scripts/plot_heatmap.R"
 
