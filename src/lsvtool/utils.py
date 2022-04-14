@@ -3,6 +3,7 @@ import numpy as np
 from collections import Counter
 from pathlib import Path
 
+
 class Summary(Counter):
 
     def print_stats(self, name=None, value_width=15, print_to=sys.stderr):
@@ -40,7 +41,7 @@ def check_path(path_str):
     path = Path(path_str)
     if not path.exists():
         raise FileNotFoundError(f"Path {path_str} does not exist!")
-    
+
     if not path.is_absolute():
         return path.resolve()
     return path

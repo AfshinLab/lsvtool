@@ -11,12 +11,12 @@ Arguments for snakemake are passed as:
 
     $ lsvtool run [snakemake_args [snakemake_args ...]]]
 
-For example, to do a dry-run (not executing anything, only showing what would be done) use:
+For example, for a dry-run (not executing anything) use:
 
     $ lsvtool run -n
 
-For info about arguments related to Snakemake run '$ snakemake -h' or look at the official
-documentation at https://snakemake.readthedocs.io/en/stable/executing/cli.html.
+For info about arguments related to Snakemake run '$ snakemake -h' or look at the
+official documentation at https://snakemake.readthedocs.io/en/stable/executing/cli.html.
 """
 
 # Snakemake wrapping parially based on:
@@ -25,7 +25,6 @@ documentation at https://snakemake.readthedocs.io/en/stable/executing/cli.html.
 
 import logging
 import sys
-import os
 import subprocess
 from typing import List
 import pkg_resources
@@ -42,8 +41,9 @@ def add_arguments(parser):
         'Default: %(default)s (all available cores).'
     )
 
-    # This argument will not capture any arguments due to nargs=-1. Instead parse_known_args()
-    # is used in __main__.py to add any arguments not captured here to snakemake_args.
+    # This argument will not capture any arguments due to nargs=-1. Instead
+    # parse_known_args() is used in __main__.py to add any arguments not
+    # captured here to snakemake_args.
     smk_args = parser.add_argument_group("snakemake arguments")
     smk_args.add_argument(
         'snakemake_args', nargs=-1,
@@ -67,7 +67,7 @@ def run(
     snakefile: str = "lsvtool.smk",
     workdir=None,
     snakemake_args: List[str] = None,
-):   
+):
     snakefile_path = pkg_resources.resource_filename("lsvtool", "lsvtool.smk")
 
     cmd = ["snakemake", "-s", str(snakefile_path), "--cores", str(cores)]

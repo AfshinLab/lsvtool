@@ -38,7 +38,7 @@ final_input = [
     "4_merged/merged.vcf",
     "4_merged/merged.jl",
     expand("4_merged/merged_comp_mat_heatmap.{ext}", ext=fig_formats),
-    expand("4_merged/merged_comp_mat_jaccard_heatmap.{ext}", ext=fig_formats),
+    expand("4_merged/merged_comp_mat_overlap_heatmap.{ext}", ext=fig_formats),
     expand("4_merged/merged_venn.{ext}", ext=fig_formats),   
 ]
 

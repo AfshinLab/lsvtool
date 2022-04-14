@@ -1,0 +1,49 @@
+name: CI
+
+on: 
+  pull_request:
+  schedule:
+    - cron: 0 7 * * 1
+
+jobs:
+  Linting:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Setup Python
+        uses: actions/setup-python@v1
+        with:
+          python-version: 3.8
+          architecture: x64
+      - name: Install flake8
+        run:
+          pip install flake8
+      - name: Run flake8
+        run:
+          flake8 src/ tests/
+          flake8 --select=W292 --filename '*.yaml,*.yml'
+
+  Testing:
+    needs:
+      - Linting
+    name: Run pipeline
+    timeout-minutes: 12
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash -l {0}
+    steps:
+      - uses: actions/checkout@v2
+      - uses: conda-incubator/setup-miniconda@v2
+        with:
+          mamba-version: "*"
+          use-mamba: true
+          channels: conda-forge
+          environment-file: env.yaml
+          use-only-tar-bz2: true
+      - name: Install test deps
+        run: mamba install pytest pip
+      - name: Install lsvtool
+        run: pip install .
+      - name: Run tests
+        run: pytest -v tests/
