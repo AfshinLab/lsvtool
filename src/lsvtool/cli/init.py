@@ -77,7 +77,7 @@ def create_and_populate_analysis_directory(vcfs: List[Path], directory: Path,
     for vcf, name in zip(vcfs, sample_names):
         fail_if_inaccessible(vcf)
         create_symlink(vcf, directory, name)
-        
+
         # Symlink index if exists
         if vcf.with_suffix(".tbi").exists():
             create_symlink(vcf.with_suffix(".tbi"), directory, f"{name}.tbi")
