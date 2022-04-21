@@ -36,10 +36,11 @@ final_input = [
     expand("3_filtered/{filename}.final.bedpe", filename=samples),
     expand("3_filtered/{filename}.final.vcf.gz.tbi", filename=samples),
     "4_merged/merged.vcf",
+    "4_merged/merged.genotyped.vcf",
     "4_merged/merged.jl",
     expand("4_merged/merged_comp_mat_heatmap.{ext}", ext=fig_formats),
     expand("4_merged/merged_comp_mat_overlap_heatmap.{ext}", ext=fig_formats),
-    expand("4_merged/merged_venn.{ext}", ext=fig_formats),   
+    expand("4_merged/merged_venn.{ext}", ext=fig_formats),
 ]
 
 
@@ -223,6 +224,17 @@ rule reheader:
         with open(output.list, "w") as f:
             f.writelines("\n".join(samples) + "\n")
         shell("bcftools reheader -s {output.list} {input.vcf} > {output.vcf}")
+
+
+rule add_missing_genotype:
+    """Replace missing genotypes `./.` with `0/0` (e.g. ref). 
+    Useful when visualizing with `samplot vcf`."""
+    input:
+        vcf = "4_merged/merged.vcf"
+    output:
+        vcf = "4_merged/merged.genotyped.vcf"
+    shell:
+        "bcftools +setGT {input.vcf} -- -t . -n 0 > {output.vcf}"
 
 
 rule gencomp:
