@@ -1,6 +1,7 @@
 import glob
 from itertools import product
 
+import pandas as pd
 from lsvtool.utils import check_path
 
 configfile: "parameters.config"
@@ -41,6 +42,7 @@ final_input = [
     expand("4_merged/merged_comp_mat_heatmap.{ext}", ext=fig_formats),
     expand("4_merged/merged_comp_mat_overlap_heatmap.{ext}", ext=fig_formats),
     expand("4_merged/merged_venn.{ext}", ext=fig_formats),
+    expand("{sample}.counts_summary.tsv", sample=samples),
 ]
 
 
@@ -412,3 +414,78 @@ rule vcf2df_merge:
         " {input.vcf}"
         " {output.jl}"
         " 2> {log}"
+
+
+ruleorder: survivor_stats > survivor_stats_gzipped
+
+
+rule survivor_stats:
+    """Collect count statistics for SVs"""
+    input:
+        vcf = "{file}.vcf"
+    output:
+        bylength = "{file}.counts_by_length.tsv",
+        total = "{file}.counts_total.tsv",a
+        bychrom = "{file}.counts_support.tsv"
+    shell:
+        "SURVIVOR stats"
+        " {input.vcf}"
+        " -1"
+        " -1"
+        " -1"
+        " {wildcards.file}_tmp"
+        " > {output.total}"
+        " &&"
+        " mv {wildcards.file}_tmp {output.bylength}"
+        " &&"
+        " mv {wildcards.file}_tmp_CHR {output.bychrom}"
+        " &&"
+        " rm {wildcards.file}_tmpsupport"  # This file is just empty for whatever reason
+
+
+rule survivor_stats_gzipped:
+    """Same as survivor_stats but with gzipped vcfs."""
+    input:
+        vcf = "{file}.vcf.gz"
+    output:
+        bylength = "{file}.counts_by_length.tsv",
+        total = "{file}.counts_total.tsv",
+        bychrom = "{file}.counts_support.tsv"
+    shell:
+        "SURVIVOR stats"
+        " <(zless {input.vcf})"
+        " -1"
+        " -1"
+        " -1"
+        " {wildcards.file}_tmp"
+        " > {output.total}"
+        " &&"
+        " mv {wildcards.file}_tmp {output.bylength}"
+        " &&"
+        " mv {wildcards.file}_tmp_CHR {output.bychrom}"
+        " &&"
+        " rm {wildcards.file}_tmpsupport"  # This file is just empty for whatever reason
+
+
+rule sv_counts_summary:
+    """Aggregate counts_total per sample to get an overview of remaining SV after processing"""
+    input:
+        tsvs = [
+            "{sample}.counts_total.tsv",
+            "1_selected/{sample}.counts_total.tsv",
+            "2_collapsed/{sample}.counts_total.tsv",
+            "3_filtered/{sample}.counts_total.tsv",
+            "3_filtered/{sample}.final.counts_total.tsv",
+        ]
+    output:
+        tsv = "{sample}.counts_summary.tsv"
+    run:
+        data = []
+        steps = ["start", "selected", "collapsed", "filtered", "filtered_final"]
+        for file, step in zip(input.tsvs, steps):
+            d = pd.read_csv(file, sep="\t", header=2)
+            d = d.assign(Step=step)
+            data.append(d)
+        
+        data = pd.concat(data)
+        data.to_csv(output.tsv, sep="\t", index=False)
