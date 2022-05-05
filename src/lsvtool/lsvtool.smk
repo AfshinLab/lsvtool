@@ -446,7 +446,8 @@ rule survivor_stats:
 rule survivor_stats_gzipped:
     """Same as survivor_stats but with gzipped vcfs."""
     input:
-        vcf = "{file}.vcf.gz"
+        vcf = "{file}.vcf.gz",
+        index = "{file}.vcf.gz.tbi",
     output:
         bylength = "{file}.counts_by_length.tsv",
         total = "{file}.counts_total.tsv",
