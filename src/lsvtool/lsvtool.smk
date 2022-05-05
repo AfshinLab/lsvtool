@@ -425,8 +425,8 @@ rule survivor_stats:
         vcf = "{file}.vcf"
     output:
         bylength = "{file}.counts_by_length.tsv",
-        total = "{file}.counts_total.tsv",a
-        bychrom = "{file}.counts_support.tsv"
+        total = "{file}.counts_total.tsv",
+        bychrom = "{file}.counts_by_chrom.tsv"
     shell:
         "SURVIVOR stats"
         " {input.vcf}"
@@ -450,7 +450,7 @@ rule survivor_stats_gzipped:
     output:
         bylength = "{file}.counts_by_length.tsv",
         total = "{file}.counts_total.tsv",
-        bychrom = "{file}.counts_support.tsv"
+        bychrom = "{file}.counts_by_chrom.tsv"
     shell:
         "SURVIVOR stats"
         " <(zless {input.vcf})"
